@@ -1,4 +1,4 @@
-use std::{io, path::PathBuf};
+use std::io;
 
 use bytes::BytesMut;
 use tokio::{
@@ -22,11 +22,7 @@ pub struct MessageWriter {
 }
 
 impl MessageWriter {
-    pub fn new(pipe_path: &PathBuf) -> Result<MessageWriterHandle, io::Error> {
-        let pipe_writer = pipe::OpenOptions::new()
-            .read_write(true)
-            .open_sender(pipe_path)?;
-
+    pub fn new(pipe_writer: pipe::Sender) -> Result<MessageWriterHandle, io::Error> {
         let (sender, receiver) = mpsc::channel(8);
         let mut manager = Self {
             pipe_writer,
@@ -57,6 +53,7 @@ impl MessageWriter {
     }
 }
 
+#[derive(Debug)]
 pub struct MessageWriterHandle {
     sender: mpsc::Sender<MessageWriterCommand>,
 }
@@ -97,28 +94,41 @@ mod tests {
 
     use super::*;
     use test_utils::TestPipe;
-    use tokio::io::AsyncReadExt;
+    use tokio::io::AsyncReadExt as _;
 
     #[tokio::test]
     async fn should_write_data_to_pipe() {
-        let pipe = TestPipe::new();
-        let writer_handle = MessageWriter::new(&pipe.pipe_path).unwrap();
-        test_writing_data(&pipe, &writer_handle, b"Hello world\n").await;
-        test_writing_data(&pipe, &writer_handle, b"Next message: lorem ipsum\n").await;
+        let (sender, mut receiver) = pipe::pipe().unwrap();
+        let writer_handle = MessageWriter::new(sender).unwrap();
+        test_writing_data(&mut receiver, &writer_handle, b"Hello world\n").await;
+        test_writing_data(&mut receiver, &writer_handle, b"Just a message\n").await;
     }
 
-    async fn test_writing_data(pipe: &TestPipe, writer_handle: &MessageWriterHandle, data: &[u8]) {
+    #[tokio::test]
+    async fn should_write_data_to_named_pipe() {
+        let pipe = TestPipe::new();
+        let writer_handle = MessageWriter::new(pipe.writer()).unwrap();
+        let mut reader = pipe.reader();
+        test_writing_data(&mut reader, &writer_handle, b"Hello world\n").await;
+        test_writing_data(&mut reader, &writer_handle, b"Next message: lorem ipsum\n").await;
+    }
+
+    async fn test_writing_data(
+        receiver: &mut pipe::Receiver,
+        writer_handle: &MessageWriterHandle,
+        data: &[u8],
+    ) {
         writer_handle.write(data.into()).await.unwrap();
 
         let mut buf = Vec::new();
-        pipe.reader().read_buf(&mut buf).await.unwrap();
+        receiver.read_buf(&mut buf).await.unwrap();
         assert_eq!(data.to_vec(), buf);
     }
 
     #[tokio::test]
     async fn should_abort_writer_process() {
         let pipe = TestPipe::new();
-        let writer = MessageWriter::new(&pipe.pipe_path).unwrap();
+        let writer = MessageWriter::new(pipe.writer()).unwrap();
         writer.abort().await;
         tokio::time::sleep(Duration::from_secs(1)).await; // wait, because abort() returns immediately
         assert!(!writer.is_alive().await);

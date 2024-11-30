@@ -11,4 +11,5 @@ pub use manager::{ProcessManager, ProcessManagerHandle};
 pub use model::ProcessId;
 pub use model::{
     Cmd, CmdBuilder, CmdBuilderError, CmdOptions, CmdOptionsBuilder, CmdOptionsBuilderError,
+    MessagingType,
 };

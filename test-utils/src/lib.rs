@@ -1,12 +1,10 @@
+pub mod cmd_collection;
+
 use std::path::PathBuf;
 
 use nix::{sys::stat, unistd};
-use proc_heim::{Cmd, CmdBuilder};
 use tempfile::{tempdir, TempDir};
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::unix::pipe,
-};
+use tokio::net::unix::pipe;
 use uuid::Uuid;
 
 pub struct TestPipe {
@@ -25,29 +23,17 @@ impl TestPipe {
         }
     }
 
-    pub fn writer(&self) -> impl AsyncWriteExt {
+    pub fn writer(&self) -> pipe::Sender {
         pipe::OpenOptions::new()
             .read_write(true)
             .open_sender(&self.pipe_path)
             .unwrap()
     }
 
-    pub fn reader(&self) -> impl AsyncReadExt {
+    pub fn reader(&self) -> pipe::Receiver {
         pipe::OpenOptions::new()
             .read_write(true)
             .open_receiver(&self.pipe_path)
             .unwrap()
     }
-}
-
-pub fn echo_cmd(text: &str) -> Cmd {
-    CmdBuilder::default()
-        .cmd("echo".into())
-        .args(vec!["-n".into(), text.into()].into())
-        .build()
-        .unwrap()
-}
-
-pub fn cat_cmd() -> Cmd {
-    CmdBuilder::default().cmd("cat".into()).build().unwrap()
 }

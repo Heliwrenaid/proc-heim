@@ -1,9 +1,7 @@
-use std::{io, path::PathBuf};
-
 use bytes::BytesMut;
 use tokio::{
     io::AsyncReadExt as _,
-    net::unix::{self, pipe::Receiver},
+    net::unix::pipe::Receiver,
     select,
     sync::{
         broadcast::{self},
@@ -29,26 +27,22 @@ pub struct MessageReader {
 
 impl MessageReader {
     pub fn new(
-        pipe_path: &PathBuf,
+        pipe_reader: Receiver,
         capacity: Option<usize>,
     ) -> Result<MessageReaderHandle, MessageReaderError> {
-        let (mut reader, sender) = Self::create(pipe_path, capacity)?;
+        let (mut reader, sender) = Self::create(pipe_reader, capacity)?;
         tokio::spawn(async move { reader.run().await });
         Ok(MessageReaderHandle::new(sender))
     }
 
     fn create(
-        pipe_path: &PathBuf,
+        pipe_reader: Receiver,
         capacity: Option<usize>,
     ) -> Result<(Self, mpsc::Sender<MessageReaderCommand>), MessageReaderError> {
         let capacity = capacity.unwrap_or(16);
         if Self::is_capacity_invalid(capacity) {
             return Err(MessageReaderError::InvalidChannelCapacity(capacity));
         }
-
-        let pipe_reader = unix::pipe::OpenOptions::new()
-            .read_write(true)
-            .open_receiver(pipe_path)?;
         let (sender, subscription_receiver) = mpsc::channel(32);
 
         let (message_broadcaster, message_receiver) = broadcast::channel(capacity);
@@ -110,6 +104,7 @@ impl MessageReader {
     }
 }
 
+#[derive(Debug)]
 pub struct MessageReaderHandle {
     sender: mpsc::Sender<MessageReaderCommand>,
 }
@@ -139,24 +134,42 @@ impl MessageReaderHandle {
 pub enum MessageReaderError {
     #[error("Invalid channel capacity: {0}")]
     InvalidChannelCapacity(usize),
-    #[error(transparent)]
-    UnexpectedIoError(#[from] io::Error),
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, time::Duration};
-
-    use tempfile::tempdir;
+    use std::time::Duration;
     use test_utils::TestPipe;
-    use tokio::io::AsyncWriteExt;
+    use tokio::{io::AsyncWriteExt, net::unix::pipe};
 
     use super::*;
 
     #[tokio::test]
+    async fn should_read_messages_from_pipe() {
+        let (mut sender, receiver) = pipe::pipe().unwrap();
+        let reader = MessageReader::new(receiver, None).unwrap();
+
+        let writer_handle = tokio::spawn(async move {
+            sender.write_all(b"Message 1\n").await.unwrap();
+            sender.write_all(b"Message 2\n").await.unwrap();
+        });
+
+        let mut receiver = reader.subscribe().await.unwrap();
+
+        let msg = receiver.recv().await.unwrap();
+        assert_eq!(b"Message 1", &msg[..]);
+
+        let msg = receiver.recv().await.unwrap();
+        assert_eq!(b"Message 2", &msg[..]);
+
+        writer_handle.await.unwrap();
+        assert!(receiver.try_recv().is_err());
+    }
+
+    #[tokio::test]
     async fn should_read_messages_from_named_pipe() {
         let pipe = TestPipe::new();
-        let reader = MessageReader::new(&pipe.pipe_path, None).unwrap();
+        let reader = MessageReader::new(pipe.reader(), None).unwrap();
 
         let mut writer = pipe.writer();
         let writer_handle = tokio::spawn(async move {
@@ -179,7 +192,7 @@ mod tests {
     #[tokio::test]
     async fn should_subscribe_multiple_times() {
         let pipe = TestPipe::new();
-        let reader = MessageReader::new(&pipe.pipe_path, None).unwrap();
+        let reader = MessageReader::new(pipe.reader(), None).unwrap();
 
         let mut writer = pipe.writer();
         let writer_handle = tokio::spawn(async move {
@@ -205,47 +218,25 @@ mod tests {
     #[tokio::test]
     async fn should_abort_reader_process() {
         let pipe = TestPipe::new();
-        let reader = MessageReader::new(&pipe.pipe_path, None).unwrap();
+        let reader = MessageReader::new(pipe.reader(), None).unwrap();
         reader.abort().await;
         assert!(reader.subscribe().await.is_err());
     }
 
-    #[test]
-    fn should_return_err_when_capacity_is_invalid() {
+    #[tokio::test]
+    async fn should_return_err_when_capacity_is_invalid() {
         let pipe = TestPipe::new();
 
-        let result = MessageReader::new(&pipe.pipe_path, Some(0));
+        let result = MessageReader::new(pipe.reader(), Some(0));
         assert!(matches!(
             result,
             Err(MessageReaderError::InvalidChannelCapacity(_))
         ));
 
-        let result = MessageReader::new(&pipe.pipe_path, Some(usize::MAX / 2 + 1));
+        let result = MessageReader::new(pipe.reader(), Some(usize::MAX / 2 + 1));
         assert!(matches!(
             result,
             Err(MessageReaderError::InvalidChannelCapacity(_))
-        ));
-    }
-
-    #[test]
-    fn should_return_err_when_file_is_not_found() {
-        let invalid_file_path = "random_file_path".try_into().unwrap();
-        let result = MessageReader::new(&invalid_file_path, None);
-        assert!(matches!(
-            result,
-            Err(MessageReaderError::UnexpectedIoError(_))
-        ));
-    }
-
-    #[test]
-    fn should_return_err_when_file_is_not_a_pipe() {
-        let tmp_dir = tempdir().unwrap();
-        let file_path = tmp_dir.path().join("not_a_pipe");
-        let _ = File::create(&file_path).unwrap();
-        let result = MessageReader::new(&file_path, None);
-        assert!(matches!(
-            result,
-            Err(MessageReaderError::UnexpectedIoError(_))
         ));
     }
 }

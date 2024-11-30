@@ -11,15 +11,12 @@ use tokio_stream::{
 
 use crate::working_dir::WorkingDir;
 
+use super::spawner::ProcessSpawner;
 use super::{
     model::{Process, ProcessId},
-    reader::{MessageReader, MessageReaderError, MessageReaderHandle},
+    reader::MessageReaderError,
     spawner::SpawnerError,
     Cmd,
-};
-use super::{
-    spawner::ProcessSpawner,
-    writer::{MessageWriter, MessageWriterHandle},
 };
 
 #[derive(Debug)]
@@ -39,15 +36,13 @@ enum ProcessManagerMessage {
     },
     KillProcess {
         id: ProcessId,
-        responder: oneshot::Sender<()>,
+        responder: oneshot::Sender<Result<(), KillProcessError>>,
     },
 }
 
 pub struct ProcessManager {
     process_spawner: ProcessSpawner,
     processes: HashMap<ProcessId, Process>,
-    message_writers: HashMap<ProcessId, MessageWriterHandle>,
-    message_readers: HashMap<ProcessId, MessageReaderHandle>,
     receiver: mpsc::Receiver<ProcessManagerMessage>,
 }
 
@@ -58,8 +53,6 @@ impl ProcessManager {
             process_spawner: ProcessSpawner::new(WorkingDir::new(working_dir)),
             receiver,
             processes: HashMap::new(),
-            message_writers: HashMap::new(),
-            message_readers: HashMap::new(),
         };
         tokio::spawn(async move { manager.run().await });
         ProcessManagerHandle::new(sender)
@@ -78,8 +71,8 @@ impl ProcessManager {
                 let _ = responder.send(result);
             }
             ProcessManagerMessage::KillProcess { id, responder } => {
-                self.kill_process(id).await;
-                let _ = responder.send(());
+                let result = self.kill_process(id).await;
+                let _ = responder.send(result);
             }
             ProcessManagerMessage::SubscribeMessageStream { id, responder } => {
                 let result = self.subscribe_to_message_stream(id).await;
@@ -98,31 +91,24 @@ impl ProcessManager {
 
     async fn spawn_process(&mut self, cmd: Cmd) -> Result<ProcessId, SpawnProcessError> {
         let id = ProcessId::random();
-        let options = cmd.options.clone(); // TODO: moze te spawnanie tych readerów, writerów przenniesc do spanwer'a
         let process = self.process_spawner.spawn(&id, cmd)?;
-
-        if let Some(ref input_pipe) = process.input_pipe {
-            let writer = MessageWriter::new(input_pipe)?;
-            self.message_writers.insert(id.clone(), writer);
-        }
-
-        if let Some(ref output_pipe) = process.output_pipe {
-            let reader = MessageReader::new(output_pipe, options.output_buffer_capacity)?;
-            self.message_readers.insert(id.clone(), reader);
-        }
-
         self.processes.insert(id.clone(), process);
         Ok(id)
     }
 
-    async fn kill_process(&mut self, id: ProcessId) {
-        if let Some(reader) = self.message_readers.remove(&id) {
+    async fn kill_process(&mut self, id: ProcessId) -> Result<(), KillProcessError> {
+        let process = self
+            .processes
+            .get_mut(&id)
+            .ok_or(KillProcessError::ProcessNotFound(id))?;
+        if let Some(reader) = process.message_reader.take() {
             reader.abort().await;
         }
-        if let Some(writer) = self.message_writers.remove(&id) {
+        if let Some(writer) = process.message_writer.take() {
             writer.abort().await;
         }
         self.processes.remove(&id); // kill_on_drop() is used to kill child process
+        Ok(())
     }
 
     async fn subscribe_to_message_stream(
@@ -130,9 +116,13 @@ impl ProcessManager {
         id: ProcessId,
     ) -> Result<broadcast::Receiver<Vec<u8>>, ReadMessageError> {
         let reader = self
-            .message_readers
+            .processes
             .get(&id)
-            .ok_or(ReadMessageError::ProcessNotFound(id))?;
+            .ok_or(ReadMessageError::ProcessNotFound(id))?
+            .message_reader
+            .as_ref()
+            .ok_or(ReadMessageError::MessageReaderNotFound(id))?;
+
         let receiver = reader
             .subscribe()
             .await
@@ -146,9 +136,12 @@ impl ProcessManager {
         data: Vec<u8>,
     ) -> Result<(), WriteMessageError> {
         let writer = self
-            .message_writers
+            .processes
             .get(&id)
-            .ok_or(WriteMessageError::ProcessNotFound(id))?;
+            .ok_or(WriteMessageError::ProcessNotFound(id))?
+            .message_writer
+            .as_ref()
+            .ok_or(WriteMessageError::MessageWriterNotFound(id))?;
         writer.write(data).await.map_err(Into::into)
     }
 }
@@ -230,7 +223,8 @@ impl ProcessManagerHandle {
         let (responder, receiver) = oneshot::channel();
         let msg = ProcessManagerMessage::KillProcess { id, responder };
         let _ = self.sender.send(msg).await;
-        receiver.await.map_err(Into::into)
+        receiver.await??;
+        Ok(())
     }
 }
 
@@ -260,8 +254,6 @@ pub enum SpawnProcessError {
     CannotCreateProcessWorkingDir(io::Error),
     #[error("Invalid output buffer capacity: {0}")]
     InvalidOutputBufferCapacity(usize),
-    #[error("Unexpected IO error: {0}")]
-    UnexpectedIoError(io::Error),
 }
 
 impl From<SpawnerError> for SpawnProcessError {
@@ -274,6 +266,9 @@ impl From<SpawnerError> for SpawnProcessError {
             SpawnerError::CannotCreateProcessWorkingDir(err) => {
                 SpawnProcessError::CannotCreateProcessWorkingDir(err)
             }
+            SpawnerError::InvalidOutputBufferCapacity(value) => {
+                SpawnProcessError::InvalidOutputBufferCapacity(value)
+            }
         }
     }
 }
@@ -284,79 +279,40 @@ impl From<MessageReaderError> for SpawnProcessError {
             MessageReaderError::InvalidChannelCapacity(value) => {
                 SpawnProcessError::InvalidOutputBufferCapacity(value)
             }
-            MessageReaderError::UnexpectedIoError(err) => SpawnProcessError::UnexpectedIoError(err),
         }
     }
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum ReadMessageError {
-    #[error("Cannot communicate with spawned process manager")]
-    ManagerCommunicationError(#[from] oneshot::error::RecvError),
     #[error("Process with id: {0} was not found")]
     ProcessNotFound(ProcessId),
+    #[error("Cannot communicate with spawned process manager")]
+    ManagerCommunicationError(#[from] oneshot::error::RecvError),
+    #[error("Message reader for process with id: {0} was not found")]
+    MessageReaderNotFound(ProcessId),
     #[error("Message reader process has been killed")]
     MessageReaderKilled,
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum WriteMessageError {
+    #[error("Process with id: {0} was not found")]
+    ProcessNotFound(ProcessId),
     #[error("Cannot serialize message to bytes")]
     CannotSerializeMessage,
     #[error("Cannot communicate with spawned process manager")]
     ManagerCommunicationError(#[from] oneshot::error::RecvError),
     #[error("Error occurred when writing message to process: {0}")]
     IoError(#[from] std::io::Error),
-    #[error("Process with id: {0} was not found")]
-    ProcessNotFound(ProcessId),
+    #[error("Message writer for process with id: {0} was not found")]
+    MessageWriterNotFound(ProcessId),
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum KillProcessError {
+    #[error("Process with id: {0} was not found")]
+    ProcessNotFound(ProcessId),
     #[error("Cannot communicate with spawned process manager")]
     ManagerCommunicationError(#[from] oneshot::error::RecvError),
-}
-
-#[cfg(test)]
-mod tests {
-    use tempfile::tempdir;
-    use tokio_stream::StreamExt;
-
-    use crate::{Cmd, CmdBuilder};
-
-    use super::ProcessManager;
-
-    #[tokio::test]
-    async fn should_spawn_process() {
-        let working_dir = tempdir().unwrap();
-        let handle = ProcessManager::new(working_dir.into_path());
-        let result = handle.spawn(cat_cmd()).await;
-        assert!(result.is_ok());
-    }
-
-    #[ignore] // TODO
-    #[tokio::test]
-    async fn should_get_message_stream() {
-        let working_dir = tempdir().unwrap();
-        let handle = ProcessManager::new(working_dir.into_path());
-        let process_id = handle.spawn(echo_cmd()).await.unwrap();
-
-        let mut stream = handle.subscribe_message_stream(process_id).await.unwrap();
-        assert_eq!(b"msg1", stream.next().await.unwrap().as_slice());
-    }
-
-    // TODO: move to utils
-    fn cat_cmd() -> Cmd {
-        CmdBuilder::default().cmd("cat".into()).build().unwrap()
-    }
-
-    fn echo_cmd() -> Cmd {
-        CmdBuilder::default()
-            .cmd("echo".into())
-            .args(vec!["msg1\n".into(), ">".into(), "$OUTPUT_PIPE".into()].into())
-            .build()
-            .unwrap()
-    }
-
-    // TODO: write more tests
 }
