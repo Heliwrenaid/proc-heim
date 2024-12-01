@@ -1,5 +1,5 @@
 #/bin/sh
 
 while read msg; do
-    echo "Echo: $msg"
+    echo "$msg"
 done < /dev/stdin

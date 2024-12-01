@@ -5,7 +5,8 @@ mod spawner;
 mod writer;
 
 pub use manager::{
-    KillProcessError, ReadMessageError, ReceiveMessageError, SpawnProcessError, WriteMessageError,
+    KillProcessError, ReadMessageError, ReceiveMessageBytesError, SpawnProcessError,
+    WriteMessageError,
 };
 pub use manager::{ProcessManager, ProcessManagerHandle};
 pub use model::ProcessId;

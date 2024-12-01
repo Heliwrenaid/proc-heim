@@ -164,26 +164,34 @@ impl ProcessManagerHandle {
         Ok(process_id)
     }
 
-    pub async fn subscribe_message_stream_raw(
+    pub async fn subscribe_message_bytes_stream(
         &self,
         id: ProcessId,
-    ) -> Result<impl Stream<Item = Result<Vec<u8>, ReceiveMessageError>>, ReadMessageError> {
+    ) -> Result<impl Stream<Item = Result<Vec<u8>, ReceiveMessageBytesError>>, ReadMessageError>
+    {
         let (responder, receiver) = oneshot::channel();
         let msg = ProcessManagerMessage::SubscribeMessageStream { id, responder };
         let _ = self.sender.send(msg).await;
         let message_receiver = receiver.await??;
-        let stream = BroadcastStream::new(message_receiver).map(|value| value.map_err(Into::into));
+        let stream = BroadcastStream::new(message_receiver).map(|v| v.map_err(Into::into));
         Ok(stream)
     }
 
-    pub async fn subscribe_message_stream(
+    pub async fn subscribe_message_stream<T: TryFrom<Vec<u8>>>(
         &self,
         id: ProcessId,
-    ) -> Result<impl Stream<Item = Vec<u8>>, ReadMessageError> {
+    ) -> Result<impl Stream<Item = Result<T, ReceiveMessageError>>, ReadMessageError> {
         Ok(self
-            .subscribe_message_stream_raw(id)
+            .subscribe_message_bytes_stream(id)
             .await?
-            .filter_map(Result::ok))
+            .map(Self::to_message))
+    }
+
+    fn to_message<T: TryFrom<Vec<u8>>>(
+        value: Result<Vec<u8>, ReceiveMessageBytesError>,
+    ) -> Result<T, ReceiveMessageError> {
+        let value = value?;
+        T::try_from(value).map_err(|_| ReceiveMessageError::CannotDeserializeMessage)
     }
 
     pub async fn write_message<T: TryInto<Vec<u8>>>(
@@ -229,15 +237,33 @@ impl ProcessManagerHandle {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ReceiveMessageError {
+pub enum ReceiveMessageBytesError {
     #[error("Lost {0} number of messages due to buffer capacity overflow")]
     LostMessages(u64),
 }
 
-impl From<BroadcastStreamRecvError> for ReceiveMessageError {
+#[derive(thiserror::Error, Debug)]
+pub enum ReceiveMessageError {
+    #[error("Lost {0} number of messages due to buffer capacity overflow")]
+    LostMessages(u64),
+    #[error("Cannot deserialize message")]
+    CannotDeserializeMessage,
+}
+
+impl From<BroadcastStreamRecvError> for ReceiveMessageBytesError {
     fn from(err: BroadcastStreamRecvError) -> Self {
         match err {
-            BroadcastStreamRecvError::Lagged(size) => ReceiveMessageError::LostMessages(size),
+            BroadcastStreamRecvError::Lagged(size) => ReceiveMessageBytesError::LostMessages(size),
+        }
+    }
+}
+
+impl From<ReceiveMessageBytesError> for ReceiveMessageError {
+    fn from(value: ReceiveMessageBytesError) -> Self {
+        match value {
+            ReceiveMessageBytesError::LostMessages(number) => {
+                ReceiveMessageError::LostMessages(number)
+            }
         }
     }
 }
