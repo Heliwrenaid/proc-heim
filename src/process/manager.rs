@@ -188,10 +188,14 @@ impl ProcessManagerHandle {
     }
 
     fn to_message<T: TryFrom<Vec<u8>>>(
-        value: Result<Vec<u8>, ReceiveMessageBytesError>,
+        bytes: Result<Vec<u8>, ReceiveMessageBytesError>,
     ) -> Result<T, ReceiveMessageError> {
-        let value = value?;
-        T::try_from(value).map_err(|_| ReceiveMessageError::CannotDeserializeMessage)
+        let bytes = bytes?;
+        T::try_from(bytes).map_err(|_| {
+            ReceiveMessageError::CannotDeserializeMessage(
+                "Cannot deserialize data from raw bytes using TryFrom trait".into(),
+            )
+        })
     }
 
     pub async fn write_message<T: TryInto<Vec<u8>>>(
@@ -199,9 +203,11 @@ impl ProcessManagerHandle {
         id: ProcessId,
         data: T,
     ) -> Result<(), WriteMessageError> {
-        let bytes = data
-            .try_into()
-            .map_err(|_| WriteMessageError::CannotSerializeMessage)?;
+        let bytes = data.try_into().map_err(|_| {
+            WriteMessageError::CannotSerializeMessage(
+                "Cannot serialize message to bytes using TryInto trait".into(),
+            )
+        })?;
 
         if let Some(data) = Self::into_bytes_with_eol_char(bytes) {
             let (responder, receiver) = oneshot::channel();
@@ -236,6 +242,42 @@ impl ProcessManagerHandle {
     }
 }
 
+#[cfg(any(feature = "json", feature = "message-pack"))]
+use super::serde::{DataFormat, SerdeUtil};
+
+#[cfg(any(feature = "json", feature = "message-pack"))]
+impl ProcessManagerHandle {
+    pub async fn subscribe_message_stream_with_format<T: serde::de::DeserializeOwned>(
+        &self,
+        id: ProcessId,
+        format: DataFormat,
+    ) -> Result<impl Stream<Item = Result<T, ReceiveMessageError>>, ReadMessageError> {
+        Ok(self
+            .subscribe_message_bytes_stream(id)
+            .await?
+            .map(move |bytes| Self::deserialize_message(bytes, &format)))
+    }
+
+    fn deserialize_message<T: serde::de::DeserializeOwned>(
+        bytes: Result<Vec<u8>, ReceiveMessageBytesError>,
+        format: &DataFormat,
+    ) -> Result<T, ReceiveMessageError> {
+        SerdeUtil::deserialize(&bytes?, format)
+            .map_err(|err| ReceiveMessageError::CannotDeserializeMessage(err.to_string()))
+    }
+
+    pub async fn write_messages_with_format<T: serde::Serialize>(
+        &self,
+        id: ProcessId,
+        data: T,
+        format: DataFormat,
+    ) -> Result<(), WriteMessageError> {
+        let bytes = SerdeUtil::serialize(&data, &format)
+            .map_err(|err| WriteMessageError::CannotSerializeMessage(err.to_string()))?;
+        self.write_message(id, bytes).await
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum ReceiveMessageBytesError {
     #[error("Lost {0} number of messages due to buffer capacity overflow")]
@@ -246,8 +288,8 @@ pub enum ReceiveMessageBytesError {
 pub enum ReceiveMessageError {
     #[error("Lost {0} number of messages due to buffer capacity overflow")]
     LostMessages(u64),
-    #[error("Cannot deserialize message")]
-    CannotDeserializeMessage,
+    #[error("{0}")]
+    CannotDeserializeMessage(String),
 }
 
 impl From<BroadcastStreamRecvError> for ReceiveMessageBytesError {
@@ -325,8 +367,8 @@ pub enum ReadMessageError {
 pub enum WriteMessageError {
     #[error("Process with id: {0} was not found")]
     ProcessNotFound(ProcessId),
-    #[error("Cannot serialize message to bytes")]
-    CannotSerializeMessage,
+    #[error("{0}")]
+    CannotSerializeMessage(String),
     #[error("Cannot communicate with spawned process manager")]
     ManagerCommunicationError(#[from] oneshot::error::RecvError),
     #[error("Error occurred when writing message to process: {0}")]

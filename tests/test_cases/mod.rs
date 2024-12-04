@@ -4,6 +4,9 @@ use tokio_stream::StreamExt as _;
 
 use crate::common::create_process_manager;
 
+#[cfg(any(feature = "json", feature = "message-pack"))]
+use proc_heim::DataFormat;
+
 pub async fn should_read_message<F: Fn(&str) -> Cmd>(cmd_with_message: F) {
     let (_dir, handle) = create_process_manager();
     let msg = "example message";
@@ -23,6 +26,8 @@ pub async fn should_spawn_process_then_communicate_with_it_then_kill(cmd: Cmd) {
     handle.write_message(process_id, b"msg1").await.unwrap();
     handle.write_message(process_id, b"msg2").await.unwrap();
 
+    let msg3 = b"\x95\xa0\x90\xca\xc2"; // extended ASCII codes
+
     let handle2 = handle.clone();
     let reader = tokio::spawn(async move {
         let mut stream = handle2
@@ -35,7 +40,7 @@ pub async fn should_spawn_process_then_communicate_with_it_then_kill(cmd: Cmd) {
                 0 => assert_eq!(b"msg1", &msg[..]),
                 1 => assert_eq!(b"msg2", &msg[..]),
                 2 => {
-                    assert_eq!(b"msg3", &msg[..]);
+                    assert_eq!(msg3, &msg[..]);
                     handle2.kill(process_id).await.unwrap();
                 }
                 _ => panic!("Stream should end after killing process"),
@@ -44,7 +49,7 @@ pub async fn should_spawn_process_then_communicate_with_it_then_kill(cmd: Cmd) {
         }
     });
 
-    handle.write_message(process_id, b"msg3").await.unwrap();
+    handle.write_message(process_id, msg3).await.unwrap();
     reader.await.unwrap();
 }
 
@@ -87,6 +92,29 @@ pub async fn should_read_structured_message(cmd: Cmd, message: ExampleMessage) {
         .await
         .unwrap();
     assert_eq!(message, stream.try_next().await.unwrap().unwrap());
+}
+
+#[cfg(any(feature = "json", feature = "message-pack"))]
+#[allow(dead_code)]
+pub async fn should_read_message_with_format(
+    cmd: Cmd,
+    message: ExampleMessage,
+    format: DataFormat,
+) {
+    let (_dir, handle) = create_process_manager();
+    let process_id = handle.spawn(cmd).await.unwrap();
+
+    handle
+        .write_messages_with_format(process_id, message.clone(), format.clone())
+        .await
+        .unwrap();
+
+    let mut stream = handle
+        .subscribe_message_stream_with_format::<ExampleMessage>(process_id, format)
+        .await
+        .unwrap();
+    let actual_message = stream.try_next().await.unwrap().unwrap();
+    assert_eq!(message, actual_message);
 }
 
 pub async fn should_write_json_message_and_read_part_of_it<F: Fn(&str) -> Cmd>(cmd_with_arg: F) {

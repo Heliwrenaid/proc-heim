@@ -49,6 +49,33 @@ proptest! {
         tokio::runtime::Runtime::new().unwrap()
             .block_on(test_cases::should_read_structured_message(cmd.clone(), message));
     }
+
+    #[cfg(all(feature = "json", feature = "message-pack"))]
+    #[test]
+    fn should_read_message_with_different_formats(
+            data1 in "[a-zA-Z0-9]{1,100}",
+            data2 in vec(any::<u8>(), 0..100),
+            data3 in any::<i32>(),
+            data4 in any::<f32>(),
+            data5 in any::<bool>()
+    ) {
+        use proc_heim::{DataFormat, Encoding};
+
+        let cmd = echo_daemon_script();
+        let message = ExampleMessage {
+            data1,
+            data2,
+            data3,
+            data4,
+            data5,
+        };
+        tokio::runtime::Runtime::new().unwrap()
+            .block_on(async {
+                test_cases::should_read_message_with_format(cmd.clone(), message.clone(), DataFormat::Json).await;
+                test_cases::should_read_message_with_format(cmd.clone(), message.clone(), DataFormat::MessagePack(Encoding::Hex)).await;
+                test_cases::should_read_message_with_format(cmd.clone(), message, DataFormat::MessagePack(Encoding::Base64)).await;
+            });
+    }
 }
 
 #[tokio::test]
