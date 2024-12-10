@@ -9,7 +9,7 @@ use tokio_stream::{
     Stream, StreamExt,
 };
 
-use crate::working_dir::WorkingDir;
+use crate::{working_dir::WorkingDir, ProcessData};
 
 use super::{
     log_reader::{LogReaderError, LogsQuery, LogsQueryType},
@@ -46,6 +46,10 @@ enum ProcessManagerMessage {
         logs_query_type: LogsQueryType,
         query: LogsQuery,
         responder: oneshot::Sender<Result<Vec<String>, GetLogsError>>,
+    },
+    GetProcessData {
+        id: ProcessId,
+        responder: oneshot::Sender<Result<ProcessData, GetProcessDataError>>,
     },
 }
 
@@ -102,6 +106,10 @@ impl ProcessManager {
                 responder,
             } => {
                 let result = self.get_logs(id, logs_query_type, query).await;
+                let _ = responder.send(result);
+            }
+            ProcessManagerMessage::GetProcessData { id, responder } => {
+                let result = self.get_process_data(id);
                 let _ = responder.send(result);
             }
         }
@@ -182,6 +190,16 @@ impl ProcessManager {
             .read_logs(logs_query_type, query)
             .await
             .map_err(Into::into)
+    }
+
+    fn get_process_data(&mut self, id: ProcessId) -> Result<ProcessData, GetProcessDataError> {
+        let process = self
+            .processes
+            .get_mut(&id)
+            .ok_or(GetProcessDataError::ProcessNotFound(id))?;
+        let pid = process.child.id();
+        let exit_status = process.child.try_wait()?;
+        Ok(ProcessData::new(pid, exit_status))
     }
 }
 
@@ -312,6 +330,17 @@ impl ProcessManagerHandle {
         let _ = self.sender.send(msg).await;
         let logs = receiver.await??;
         Ok(logs)
+    }
+
+    pub async fn get_process_data(
+        &self,
+        id: ProcessId,
+    ) -> Result<ProcessData, GetProcessDataError> {
+        let (responder, receiver) = oneshot::channel();
+        let msg = ProcessManagerMessage::GetProcessData { id, responder };
+        let _ = self.sender.send(msg).await;
+        let data = receiver.await??;
+        Ok(data)
     }
 }
 
@@ -481,4 +510,14 @@ impl From<LogReaderError> for GetLogsError {
             LogReaderError::UnExpectedIoError(err) => Self::UnExpectedIoError(err),
         }
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum GetProcessDataError {
+    #[error("Process with id: {0} was not found")]
+    ProcessNotFound(ProcessId),
+    #[error("Cannot communicate with spawned process manager")]
+    ManagerCommunicationError(#[from] oneshot::error::RecvError),
+    #[error(transparent)]
+    UnExpectedIoError(#[from] io::Error),
 }
