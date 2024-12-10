@@ -4,33 +4,45 @@ use derive_builder::Builder;
 
 #[derive(Debug, Clone, Builder)]
 pub struct Cmd {
+    #[builder(setter(into))]
     pub cmd: String,
-    #[builder(default = "None")]
+    #[builder(setter(into, strip_option), default)]
     pub args: Option<Vec<String>>,
-    #[builder(default)]
+    #[builder(setter(into), default)]
     pub options: CmdOptions,
 }
 
 #[derive(Debug, Clone, Builder, Default)]
+#[builder(build_fn(validate = "Self::validate"))]
 pub struct CmdOptions {
-    #[builder(default = "None")]
+    #[builder(setter(into, strip_option), default)]
     pub current_dir: Option<PathBuf>,
-    #[builder(default = "false")]
+    #[builder(setter(into, strip_option), default = "false")]
     pub clear_envs: bool,
-    #[builder(default = "None")]
+    #[builder(setter(into, strip_option), default)]
     pub envs: Option<HashMap<String, String>>,
-    #[builder(default = "None")]
+    #[builder(setter(into, strip_option), default)]
     pub output_buffer_capacity: Option<usize>,
-    #[builder(default = "None")]
+    #[builder(setter(into, strip_option), default)]
     pub message_input: Option<MessagingType>,
-    #[builder(default = "None")]
+    #[builder(setter(into, strip_option), default)]
     pub message_output: Option<MessagingType>,
+    #[builder(setter(into, strip_option), default)]
+    pub logging_type: Option<LoggingType>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MessagingType {
     StandardIo,
     NamedPipe,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LoggingType {
+    StdoutOnly,
+    StderrOnly,
+    StdoutAndStderr,
+    StdoutAndStderrMerged,
 }
 
 impl CmdOptions {
@@ -44,9 +56,29 @@ impl CmdOptions {
 
     fn with_same_in_out(messaging_type: MessagingType) -> CmdOptions {
         CmdOptionsBuilder::default()
-            .message_input(Some(messaging_type.clone()))
-            .message_output(Some(messaging_type))
+            .message_input(messaging_type.clone())
+            .message_output(messaging_type)
             .build()
             .unwrap()
+    }
+}
+
+impl CmdOptionsBuilder {
+    fn validate(&self) -> Result<(), String> {
+        if let Some(ref message_output) = self.message_output {
+            if let Some(message_output) = message_output {
+                if message_output == &MessagingType::StandardIo && self.logging_type.is_some() {
+                    if let Some(logging_type) = self.logging_type.as_ref().unwrap() {
+                        if logging_type != &LoggingType::StderrOnly {
+                            Err(format!(
+                                "Cannot setup logging type: {:?}, when message output is: {:?}",
+                                logging_type, message_output
+                            ))?;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }

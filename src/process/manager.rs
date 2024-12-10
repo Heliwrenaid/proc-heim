@@ -11,7 +11,10 @@ use tokio_stream::{
 
 use crate::working_dir::WorkingDir;
 
-use super::spawner::ProcessSpawner;
+use super::{
+    log_reader::{LogReaderError, LogsQuery, LogsQueryType},
+    spawner::ProcessSpawner,
+};
 use super::{
     model::{Process, ProcessId},
     reader::MessageReaderError,
@@ -37,6 +40,12 @@ enum ProcessManagerMessage {
     KillProcess {
         id: ProcessId,
         responder: oneshot::Sender<Result<(), KillProcessError>>,
+    },
+    GetLogs {
+        id: ProcessId,
+        logs_query_type: LogsQueryType,
+        query: LogsQuery,
+        responder: oneshot::Sender<Result<Vec<String>, GetLogsError>>,
     },
 }
 
@@ -86,6 +95,15 @@ impl ProcessManager {
                 let result = self.write_message(id, data).await;
                 let _ = responder.send(result);
             }
+            ProcessManagerMessage::GetLogs {
+                id,
+                logs_query_type,
+                query,
+                responder,
+            } => {
+                let result = self.get_logs(id, logs_query_type, query).await;
+                let _ = responder.send(result);
+            }
         }
     }
 
@@ -106,6 +124,9 @@ impl ProcessManager {
         }
         if let Some(writer) = process.message_writer.take() {
             writer.abort().await;
+        }
+        if let Some(log_reader) = process.log_reader.take() {
+            log_reader.abort().await;
         }
         self.processes.remove(&id); // kill_on_drop() is used to kill child process
         Ok(())
@@ -135,14 +156,32 @@ impl ProcessManager {
         id: ProcessId,
         data: Vec<u8>,
     ) -> Result<(), WriteMessageError> {
-        let writer = self
-            .processes
+        self.processes
             .get(&id)
             .ok_or(WriteMessageError::ProcessNotFound(id))?
             .message_writer
             .as_ref()
-            .ok_or(WriteMessageError::MessageWriterNotFound(id))?;
-        writer.write(data).await.map_err(Into::into)
+            .ok_or(WriteMessageError::MessageWriterNotFound(id))?
+            .write(data)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn get_logs(
+        &mut self,
+        id: ProcessId,
+        logs_query_type: LogsQueryType,
+        query: LogsQuery,
+    ) -> Result<Vec<String>, GetLogsError> {
+        self.processes
+            .get(&id)
+            .ok_or(GetLogsError::ProcessNotFound(id))?
+            .log_reader
+            .as_ref()
+            .ok_or(GetLogsError::LogReaderNotFound(id))?
+            .read_logs(logs_query_type, query)
+            .await
+            .map_err(Into::into)
     }
 }
 
@@ -239,6 +278,40 @@ impl ProcessManagerHandle {
         let _ = self.sender.send(msg).await;
         receiver.await??;
         Ok(())
+    }
+
+    pub async fn get_logs_stdout(
+        &self,
+        id: ProcessId,
+        query: LogsQuery,
+    ) -> Result<Vec<String>, GetLogsError> {
+        self.get_logs(id, LogsQueryType::Stdout, query).await
+    }
+
+    pub async fn get_logs_stderr(
+        &self,
+        id: ProcessId,
+        query: LogsQuery,
+    ) -> Result<Vec<String>, GetLogsError> {
+        self.get_logs(id, LogsQueryType::Stderr, query).await
+    }
+
+    async fn get_logs(
+        &self,
+        id: ProcessId,
+        logs_query_type: LogsQueryType,
+        query: LogsQuery,
+    ) -> Result<Vec<String>, GetLogsError> {
+        let (responder, receiver) = oneshot::channel();
+        let msg = ProcessManagerMessage::GetLogs {
+            id,
+            logs_query_type,
+            query,
+            responder,
+        };
+        let _ = self.sender.send(msg).await;
+        let logs = receiver.await??;
+        Ok(logs)
     }
 }
 
@@ -383,4 +456,29 @@ pub enum KillProcessError {
     ProcessNotFound(ProcessId),
     #[error("Cannot communicate with spawned process manager")]
     ManagerCommunicationError(#[from] oneshot::error::RecvError),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum GetLogsError {
+    #[error("Process with id: {0} was not found")]
+    ProcessNotFound(ProcessId),
+    #[error("Cannot communicate with spawned process manager")]
+    ManagerCommunicationError(#[from] oneshot::error::RecvError),
+    #[error("Logging type: {0} was not configured for process")]
+    LoggingTypeWasNotConfigured(String),
+    #[error("Log read for process with id: {0} was not found")]
+    LogReaderNotFound(ProcessId),
+    #[error(transparent)]
+    UnExpectedIoError(#[from] io::Error),
+}
+
+impl From<LogReaderError> for GetLogsError {
+    fn from(err: LogReaderError) -> Self {
+        match err {
+            LogReaderError::LogTypeWasNotConfigured(log_type) => {
+                Self::LoggingTypeWasNotConfigured(log_type.to_string())
+            }
+            LogReaderError::UnExpectedIoError(err) => Self::UnExpectedIoError(err),
+        }
+    }
 }

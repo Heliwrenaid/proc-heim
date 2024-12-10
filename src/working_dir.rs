@@ -19,6 +19,18 @@ impl WorkingDir {
         self.dir.join(id.to_string()).join("reader_pipe")
     }
 
+    pub(crate) fn logs_stdout(&self, id: &ProcessId) -> PathBuf {
+        self.dir.join(id.to_string()).join("stdout_logs")
+    }
+
+    pub(crate) fn logs_stderr(&self, id: &ProcessId) -> PathBuf {
+        self.dir.join(id.to_string()).join("stderr_logs")
+    }
+
+    pub(crate) fn logs_merged(&self, id: &ProcessId) -> PathBuf {
+        self.dir.join(id.to_string()).join("logs")
+    }
+
     pub(crate) fn create_process_dir(&self, id: &ProcessId) -> io::Result<()> {
         fs::create_dir(self.dir.join(id.to_string()))
     }

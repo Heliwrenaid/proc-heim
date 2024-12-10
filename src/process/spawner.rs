@@ -1,11 +1,16 @@
-use std::{io, path::PathBuf};
+use std::{fs::File, io, path::PathBuf};
 
-use nix::{errno::Errno, sys::stat, unistd};
+use nix::{
+    errno::Errno,
+    sys::stat::{self},
+    unistd,
+};
 use tokio::{net::unix, process::Command};
 
-use crate::working_dir::WorkingDir;
+use crate::{working_dir::WorkingDir, LoggingType};
 
 use super::{
+    log_reader::LogReader,
     model::{MessagingType, Process, ProcessBuilder},
     reader::{MessageReader, MessageReaderError},
     writer::MessageWriter,
@@ -86,6 +91,45 @@ impl ProcessSpawner {
             process_builder = process_builder.message_writer(MessageWriter::new(sender)?.into())
         }
 
+        if let Some(ref logging_type) = cmd.options.logging_type {
+            match logging_type {
+                LoggingType::StdoutOnly => {
+                    let path = self.working_dir.logs_stdout(id);
+                    let file = Self::create_log_file(&path)?;
+                    child.stdout(file);
+                    let reader = LogReader::new(path.into(), None, None);
+                    process_builder = process_builder.log_reader(reader.into());
+                }
+                LoggingType::StderrOnly => {
+                    let path = self.working_dir.logs_stderr(id);
+                    let file = Self::create_log_file(&path)?;
+                    child.stderr(file);
+                    let reader = LogReader::new(None, path.into(), None);
+                    process_builder = process_builder.log_reader(reader.into());
+                }
+                LoggingType::StdoutAndStderr => {
+                    let stdout_path = self.working_dir.logs_stdout(id);
+                    let file = Self::create_log_file(&stdout_path)?;
+                    child.stdout(file);
+
+                    let stderr_path = self.working_dir.logs_stderr(id);
+                    let file = Self::create_log_file(&stderr_path)?;
+                    child.stderr(file);
+                    let reader = LogReader::new(stdout_path.into(), stderr_path.into(), None);
+                    process_builder = process_builder.log_reader(reader.into());
+                }
+                LoggingType::StdoutAndStderrMerged => {
+                    let path = self.working_dir.logs_merged(id);
+                    let file1 = Self::create_log_file(&path)?;
+                    let file2 = file1.try_clone()?;
+                    child.stdout(file1);
+                    child.stderr(file2);
+                    let reader = LogReader::new(None, None, path.into());
+                    process_builder = process_builder.log_reader(reader.into());
+                }
+            }
+        }
+
         let child_handle = child.spawn()?;
 
         Ok(process_builder.child(child_handle).build().unwrap())
@@ -94,6 +138,11 @@ impl ProcessSpawner {
     fn create_named_pipe(pipe_path: &PathBuf) -> Result<(), SpawnerError> {
         unistd::mkfifo(pipe_path, stat::Mode::S_IRWXU)
             .map_err(|err| SpawnerError::CannotCreateNamedPipe(pipe_path.clone(), err))
+    }
+
+    fn create_log_file(path: &PathBuf) -> Result<File, SpawnerError> {
+        let file = File::options().append(true).create(true).open(path)?;
+        Ok(file)
     }
 }
 
@@ -123,7 +172,7 @@ impl From<MessageReaderError> for SpawnerError {
 mod tests {
     use std::time::Duration;
 
-    use crate::CmdBuilder;
+    use crate::{process::log_reader::LogSettingsQuery, CmdBuilder, CmdOptionsBuilder};
 
     use super::*;
 
@@ -161,8 +210,75 @@ mod tests {
         assert!(sys.process(pid).is_none());
     }
 
+    #[tokio::test]
+    async fn should_setup_logging() {
+        let working_dir = WorkingDir::new(temp_dir());
+        let spawner = ProcessSpawner::new(working_dir);
+
+        // StdoutOnly
+        let process = spawn_process_with_logging(&spawner, LoggingType::StdoutOnly);
+
+        check_logs_settings(&process, LogSettingsQuery::Stdout, true).await;
+        check_logs_settings(&process, LogSettingsQuery::Stderr, false).await;
+        check_logs_settings(&process, LogSettingsQuery::Merged, false).await;
+
+        // StderrOnly
+        let process = spawn_process_with_logging(&spawner, LoggingType::StderrOnly);
+
+        check_logs_settings(&process, LogSettingsQuery::Stdout, false).await;
+        check_logs_settings(&process, LogSettingsQuery::Stderr, true).await;
+        check_logs_settings(&process, LogSettingsQuery::Merged, false).await;
+
+        // StdoutAndStderr
+        let process = spawn_process_with_logging(&spawner, LoggingType::StdoutAndStderr);
+
+        check_logs_settings(&process, LogSettingsQuery::Stdout, true).await;
+        check_logs_settings(&process, LogSettingsQuery::Stderr, true).await;
+        check_logs_settings(&process, LogSettingsQuery::Merged, false).await;
+
+        // StdoutAndStderrMerged
+        let process = spawn_process_with_logging(&spawner, LoggingType::StdoutAndStderrMerged);
+
+        check_logs_settings(&process, LogSettingsQuery::Stdout, false).await;
+        check_logs_settings(&process, LogSettingsQuery::Stderr, false).await;
+        check_logs_settings(&process, LogSettingsQuery::Merged, true).await;
+    }
+
+    fn spawn_process_with_logging(spawner: &ProcessSpawner, logging_type: LoggingType) -> Process {
+        let id = ProcessId::random();
+        let cmd = echo_cmd(logging_type);
+        spawner.spawn(&id, cmd).unwrap()
+    }
+
+    async fn check_logs_settings(process: &Process, query: LogSettingsQuery, expected: bool) {
+        assert_eq!(
+            expected,
+            process
+                .log_reader
+                .as_ref()
+                .unwrap()
+                .check_logs_settings(query)
+                .await
+                .unwrap()
+        );
+    }
+
     fn cat_cmd() -> Cmd {
-        CmdBuilder::default().cmd("cat".into()).build().unwrap()
+        CmdBuilder::default().cmd("cat").build().unwrap()
+    }
+
+    fn echo_cmd(logging_type: LoggingType) -> Cmd {
+        CmdBuilder::default()
+            .cmd("echo")
+            .args(vec!["-n".into(), "message".into()])
+            .options(
+                CmdOptionsBuilder::default()
+                    .logging_type(logging_type)
+                    .build()
+                    .unwrap(),
+            )
+            .build()
+            .unwrap()
     }
 
     // TODO: test setting other props and error handling

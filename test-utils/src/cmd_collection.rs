@@ -3,7 +3,28 @@ use std::path::PathBuf;
 use proc_heim::{Cmd, CmdBuilder, CmdOptions, CmdOptionsBuilder, MessagingType};
 
 pub fn cat_cmd() -> Cmd {
-    CmdBuilder::default().cmd("cat".into()).build().unwrap()
+    CmdBuilder::default().cmd("cat").build().unwrap()
+}
+
+pub fn echo_cmd_with_options(msg: &str, options: CmdOptions) -> Cmd {
+    CmdBuilder::default()
+        .cmd("echo")
+        .args(vec![msg.into()])
+        .options(options)
+        .build()
+        .unwrap()
+}
+
+pub fn echo_to_stderr_cmd_with_options(msg: &str, options: CmdOptions) -> Cmd {
+    CmdBuilder::default()
+        .cmd("bash")
+        .args(vec![
+            "-c".into(),
+            format!(r#""echo -n '${msg}' >> /dev/stderr""#),
+        ])
+        .options(options)
+        .build()
+        .unwrap()
 }
 
 pub fn bash_script(script_path: PathBuf, options: CmdOptions, mut args: Vec<String>) -> Cmd {
@@ -11,8 +32,8 @@ pub fn bash_script(script_path: PathBuf, options: CmdOptions, mut args: Vec<Stri
     merged_args.append(&mut args);
 
     CmdBuilder::default()
-        .cmd("bash".into())
-        .args(merged_args.into())
+        .cmd("bash")
+        .args(merged_args)
         .options(options)
         .build()
         .unwrap()
@@ -22,17 +43,11 @@ pub mod std_io {
     use super::*;
 
     pub fn echo_cmd(msg: &str) -> Cmd {
-        CmdBuilder::default()
-            .cmd("echo".into())
-            .args(vec![msg.into()].into())
-            .options(
-                CmdOptionsBuilder::default()
-                    .message_output(Some(MessagingType::StandardIo))
-                    .build()
-                    .unwrap(),
-            )
+        let options = CmdOptionsBuilder::default()
+            .message_output(MessagingType::StandardIo)
             .build()
-            .unwrap()
+            .unwrap();
+        echo_cmd_with_options(msg, options)
     }
 
     pub fn echo_daemon_script_path() -> PathBuf {
@@ -41,6 +56,14 @@ pub mod std_io {
 
     pub fn echo_json_script() -> PathBuf {
         scripts_std_io().join("echo_json.sh")
+    }
+
+    pub fn echo_stderr_script() -> PathBuf {
+        scripts_std_io().join("echo_stderr.sh")
+    }
+
+    pub fn echo_all_args_script_path() -> PathBuf {
+        scripts_std_io().join("echo_all_args.sh")
     }
 }
 

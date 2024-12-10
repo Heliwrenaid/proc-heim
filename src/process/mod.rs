@@ -1,3 +1,4 @@
+mod log_reader;
 mod manager;
 mod model;
 mod reader;
@@ -6,9 +7,11 @@ mod spawner;
 mod writer;
 
 pub use manager::{
-    KillProcessError, ProcessManager, ProcessManagerHandle, ReadMessageError,
+    GetLogsError, KillProcessError, ProcessManager, ProcessManagerHandle, ReadMessageError,
     ReceiveMessageBytesError, ReceiveMessageError, SpawnProcessError, WriteMessageError,
 };
+
+pub use log_reader::LogsQuery;
 
 #[cfg(any(feature = "json", feature = "message-pack"))]
 pub use serde::{DataFormat, Encoding};
@@ -16,5 +19,5 @@ pub use serde::{DataFormat, Encoding};
 pub use model::ProcessId;
 pub use model::{
     Cmd, CmdBuilder, CmdBuilderError, CmdOptions, CmdOptionsBuilder, CmdOptionsBuilderError,
-    MessagingType,
+    LoggingType, MessagingType,
 };

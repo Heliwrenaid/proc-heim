@@ -1,7 +1,9 @@
 use derive_builder::Builder;
 use tokio::process::Child;
 
-use crate::process::{reader::MessageReaderHandle, writer::MessageWriterHandle};
+use crate::process::{
+    log_reader::LogReaderHandle, reader::MessageReaderHandle, writer::MessageWriterHandle,
+};
 
 #[derive(Builder, Debug)]
 #[builder(pattern = "owned")]
@@ -11,4 +13,6 @@ pub struct Process {
     pub message_writer: Option<MessageWriterHandle>,
     #[builder(default = "None")]
     pub message_reader: Option<MessageReaderHandle>,
+    #[builder(default = "None")]
+    pub log_reader: Option<LogReaderHandle>,
 }

@@ -9,6 +9,6 @@ edition = "2021"
 tempfile = "3"
 tokio = { version = "1.41.0", features = ["full"] }
 uuid = { version = "1.11.0", features = ["v4", "fast-rng"] }
-tokio-stream = { version = "0.1.16", features = ["sync"] }
+tokio-stream = { version = "0.1.16", features = ["sync", "io-util"] }
 nix = { version = "0.29.0", features = ["fs"] }
 proc-heim = { path = "../" }
