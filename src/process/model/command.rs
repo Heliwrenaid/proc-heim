@@ -2,6 +2,8 @@ use std::{collections::HashMap, path::PathBuf};
 
 use derive_builder::Builder;
 
+use crate::Runnable;
+
 #[derive(Debug, Clone, Builder)]
 pub struct Cmd {
     #[builder(setter(into))]
@@ -80,5 +82,11 @@ impl CmdOptionsBuilder {
             }
         }
         Ok(())
+    }
+}
+
+impl Runnable for Cmd {
+    fn bootstrap_cmd(&self, _process_dir: &PathBuf) -> Result<Cmd, String> {
+        Ok(self.clone())
     }
 }

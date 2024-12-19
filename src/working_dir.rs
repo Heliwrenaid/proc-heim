@@ -1,4 +1,4 @@
-use std::{fs, io, path::PathBuf};
+use std::path::PathBuf;
 
 use crate::process::ProcessId;
 
@@ -11,27 +11,27 @@ impl WorkingDir {
         Self { dir }
     }
 
+    pub(crate) fn process_dir(&self, id: &ProcessId) -> PathBuf {
+        self.dir.join(id.to_string())
+    }
+
     pub(crate) fn message_writer_pipe(&self, id: &ProcessId) -> PathBuf {
-        self.dir.join(id.to_string()).join("writer_pipe")
+        self.process_dir(id).join("writer_pipe")
     }
 
     pub(crate) fn message_reader_pipe(&self, id: &ProcessId) -> PathBuf {
-        self.dir.join(id.to_string()).join("reader_pipe")
+        self.process_dir(id).join("reader_pipe")
     }
 
     pub(crate) fn logs_stdout(&self, id: &ProcessId) -> PathBuf {
-        self.dir.join(id.to_string()).join("stdout_logs")
+        self.process_dir(id).join("stdout_logs")
     }
 
     pub(crate) fn logs_stderr(&self, id: &ProcessId) -> PathBuf {
-        self.dir.join(id.to_string()).join("stderr_logs")
+        self.process_dir(id).join("stderr_logs")
     }
 
     pub(crate) fn logs_merged(&self, id: &ProcessId) -> PathBuf {
-        self.dir.join(id.to_string()).join("logs")
-    }
-
-    pub(crate) fn create_process_dir(&self, id: &ProcessId) -> io::Result<()> {
-        fs::create_dir(self.dir.join(id.to_string()))
+        self.process_dir(id).join("logs")
     }
 }

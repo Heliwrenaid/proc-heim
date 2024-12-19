@@ -19,5 +19,6 @@ pub use serde::{DataFormat, Encoding};
 
 pub use model::{
     Cmd, CmdBuilder, CmdBuilderError, CmdOptions, CmdOptionsBuilder, CmdOptionsBuilderError,
-    LoggingType, MessagingType, ProcessData, ProcessId,
+    CustomScriptRunConfig, LoggingType, MessagingType, ProcessData, ProcessId, Runnable, Script,
+    ScriptBuilder, ScriptBuilderError, ScriptLanguage, SCRIPT_FILE_PATH_PLACEHOLDER,
 };

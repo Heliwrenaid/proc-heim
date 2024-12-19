@@ -9,7 +9,7 @@ use tokio_stream::{
     Stream, StreamExt,
 };
 
-use crate::{working_dir::WorkingDir, ProcessData};
+use crate::{working_dir::WorkingDir, ProcessData, Runnable};
 
 use super::{
     log_reader::{LogReaderError, LogsQuery, LogsQueryType},
@@ -19,13 +19,12 @@ use super::{
     model::{Process, ProcessId},
     reader::MessageReaderError,
     spawner::SpawnerError,
-    Cmd,
 };
 
 #[derive(Debug)]
 enum ProcessManagerMessage {
     SpawnProcess {
-        cmd: Cmd,
+        cmd: Box<dyn Runnable>,
         responder: oneshot::Sender<Result<ProcessId, SpawnProcessError>>,
     },
     SubscribeMessageStream {
@@ -115,9 +114,12 @@ impl ProcessManager {
         }
     }
 
-    async fn spawn_process(&mut self, cmd: Cmd) -> Result<ProcessId, SpawnProcessError> {
+    async fn spawn_process(
+        &mut self,
+        runnable: Box<dyn Runnable>,
+    ) -> Result<ProcessId, SpawnProcessError> {
         let id = ProcessId::random();
-        let process = self.process_spawner.spawn(&id, cmd)?;
+        let process = self.process_spawner.spawn_runnable(&id, runnable)?;
         self.processes.insert(id.clone(), process);
         Ok(id)
     }
@@ -213,9 +215,12 @@ impl ProcessManagerHandle {
         Self { sender }
     }
 
-    pub async fn spawn(&self, cmd: Cmd) -> Result<ProcessId, SpawnProcessError> {
+    pub async fn spawn(&self, runnable: impl Runnable) -> Result<ProcessId, SpawnProcessError> {
         let (responder, receiver) = oneshot::channel();
-        let msg = ProcessManagerMessage::SpawnProcess { cmd, responder };
+        let msg = ProcessManagerMessage::SpawnProcess {
+            cmd: Box::new(runnable),
+            responder,
+        };
         let _ = self.sender.send(msg).await;
         let process_id = receiver.await??;
         Ok(process_id)
@@ -424,6 +429,8 @@ pub enum SpawnProcessError {
     CannotCreateProcessWorkingDir(io::Error),
     #[error("Invalid output buffer capacity: {0}")]
     InvalidOutputBufferCapacity(usize),
+    #[error("Bootstrap process failed: {0}")]
+    BootstrapProcessFailed(String),
 }
 
 impl From<SpawnerError> for SpawnProcessError {
@@ -439,6 +446,7 @@ impl From<SpawnerError> for SpawnProcessError {
             SpawnerError::InvalidOutputBufferCapacity(value) => {
                 SpawnProcessError::InvalidOutputBufferCapacity(value)
             }
+            SpawnerError::BootstrapProcessFailed(err) => Self::BootstrapProcessFailed(err),
         }
     }
 }

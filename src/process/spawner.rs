@@ -1,4 +1,9 @@
-use std::{fs::File, io, path::PathBuf};
+use std::{
+    fs::{self, File},
+    io,
+    path::PathBuf,
+    process::Stdio,
+};
 
 use nix::{
     errno::Errno,
@@ -7,7 +12,7 @@ use nix::{
 };
 use tokio::{net::unix, process::Command};
 
-use crate::{working_dir::WorkingDir, LoggingType};
+use crate::{working_dir::WorkingDir, LoggingType, Runnable};
 
 use super::{
     log_reader::LogReader,
@@ -26,10 +31,36 @@ impl ProcessSpawner {
         Self { working_dir }
     }
 
-    pub fn spawn(&self, id: &ProcessId, cmd: Cmd) -> Result<Process, SpawnerError> {
-        self.working_dir
-            .create_process_dir(id)
-            .map_err(SpawnerError::CannotCreateProcessWorkingDir)?;
+    pub fn spawn_runnable(
+        &self,
+        id: &ProcessId,
+        runnable: Box<dyn Runnable>,
+    ) -> Result<Process, SpawnerError> {
+        let process_dir = self.working_dir.process_dir(id);
+        fs::create_dir(&process_dir).map_err(SpawnerError::CannotCreateProcessWorkingDir)?;
+        match self.try_spawn_runnable(id, &runnable, &process_dir) {
+            Ok(process) => Ok(process),
+            Err(err) => {
+                let _ = fs::remove_dir_all(&process_dir);
+                let _ = runnable.clean_after_fail(&process_dir);
+                Err(err)
+            }
+        }
+    }
+
+    fn try_spawn_runnable(
+        &self,
+        id: &ProcessId,
+        runnable: &Box<dyn Runnable>,
+        process_dir: &PathBuf,
+    ) -> Result<Process, SpawnerError> {
+        let cmd = runnable
+            .bootstrap_cmd(&process_dir)
+            .map_err(SpawnerError::BootstrapProcessFailed)?;
+        self.spawn(id, cmd)
+    }
+
+    fn spawn(&self, id: &ProcessId, cmd: Cmd) -> Result<Process, SpawnerError> {
         let mut child = Command::new(cmd.cmd);
         if let Some(args) = cmd.args {
             child.args(args);
@@ -49,6 +80,10 @@ impl ProcessSpawner {
         }
 
         let mut process_builder = ProcessBuilder::default();
+
+        child.stdin(Stdio::null());
+        child.stdout(Stdio::null());
+        child.stderr(Stdio::null());
 
         if let Some(messaging_type) = cmd.options.message_output {
             let receiver = match messaging_type {
@@ -156,6 +191,8 @@ pub enum SpawnerError {
     CannotCreateProcessWorkingDir(io::Error),
     #[error("Invalid output buffer capacity: {0}")]
     InvalidOutputBufferCapacity(usize),
+    #[error("Bootstrap process failed: {0}")]
+    BootstrapProcessFailed(String),
 }
 
 impl From<MessageReaderError> for SpawnerError {
@@ -247,7 +284,7 @@ mod tests {
     fn spawn_process_with_logging(spawner: &ProcessSpawner, logging_type: LoggingType) -> Process {
         let id = ProcessId::random();
         let cmd = echo_cmd(logging_type);
-        spawner.spawn(&id, cmd).unwrap()
+        spawner.spawn_runnable(&id, Box::new(cmd)).unwrap()
     }
 
     async fn check_logs_settings(process: &Process, query: LogSettingsQuery, expected: bool) {
