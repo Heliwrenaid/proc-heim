@@ -19,16 +19,15 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
-      - name: Install the Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: ${{ env.RUST_VERSION_STABLE }}
-      - name: Install Nix
-        run: curl -L https://nixos.org/nix/install | sh
+      - name: Install Nix and build shell
+        run: |
+          curl -L https://nixos.org/nix/install | sh
+          . $HOME/.nix-profile/etc/profile.d/nix.sh
+          nix-shell --run "echo 'Installation completed'"
       - name: Run tests
         run: |
           . $HOME/.nix-profile/etc/profile.d/nix.sh
-          nix-shell shell.nix --run "cargo test --all-features"
+          nix-shell --run "cargo test --all-features"
 
   fmt:
     name: Rustfmt
@@ -61,21 +60,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install the Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: ${{ env.RUST_VERSION_STABLE }}
-          components: llvm-tools-preview
-      - name: Install Nix
-        run: curl -L https://nixos.org/nix/install | sh
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Install Nix and build shell
+        run: |
+          curl -L https://nixos.org/nix/install | sh
+          . $HOME/.nix-profile/etc/profile.d/nix.sh
+          nix-shell --run "echo 'Installation completed'"
       - name: Generate code coverage
         run: |
           . $HOME/.nix-profile/etc/profile.d/nix.sh
-          nix-shell shell.nix --run "cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info"
+          nix-shell --run "cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info"
       - name: Generate report
-        run: cargo llvm-cov report --html --output-dir coverage
+        run: |
+          . $HOME/.nix-profile/etc/profile.d/nix.sh
+          nix-shell --run "cargo llvm-cov report --html --output-dir coverage"
       - uses: actions/upload-artifact@v4
         with:
           name: "Coverage report"
