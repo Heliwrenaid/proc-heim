@@ -2,8 +2,12 @@ use std::path::PathBuf;
 
 use proc_heim::{Cmd, CmdBuilder, CmdOptions, CmdOptionsBuilder, MessagingType};
 
-pub fn cat_cmd() -> Cmd {
-    CmdBuilder::default().cmd("cat").build().unwrap()
+pub fn hanging_forever_cmd() -> Cmd {
+    CmdBuilder::default()
+        .cmd("tail")
+        .args(vec!["-f".into(), "/dev/stdin".into()])
+        .build()
+        .unwrap()
 }
 
 pub fn echo_cmd_with_options(msg: &str, options: CmdOptions) -> Cmd {

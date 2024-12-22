@@ -2,7 +2,7 @@ use proc_heim::{Cmd, CmdOptions};
 use proptest::collection::vec;
 use proptest::prelude::*;
 use test_utils::cmd_collection::{
-    bash_script, cat_cmd,
+    bash_script, hanging_forever_cmd,
     std_io::{self, echo_cmd},
 };
 
@@ -13,7 +13,7 @@ mod test_cases;
 #[tokio::test]
 pub async fn should_spawn_process() {
     let (_dir, handle) = create_process_manager();
-    let result = handle.spawn(cat_cmd()).await;
+    let result = handle.spawn(hanging_forever_cmd()).await;
     assert!(result.is_ok());
 }
 
