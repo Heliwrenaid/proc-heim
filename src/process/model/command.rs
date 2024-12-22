@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use derive_builder::Builder;
 
@@ -67,26 +70,26 @@ impl CmdOptions {
 
 impl CmdOptionsBuilder {
     fn validate(&self) -> Result<(), String> {
-        if let Some(ref message_output) = self.message_output {
-            if let Some(message_output) = message_output {
-                if message_output == &MessagingType::StandardIo && self.logging_type.is_some() {
-                    if let Some(logging_type) = self.logging_type.as_ref().unwrap() {
-                        if logging_type != &LoggingType::StderrOnly {
-                            Err(format!(
-                                "Cannot setup logging type: {:?}, when message output is: {:?}",
-                                logging_type, message_output
-                            ))?;
-                        }
+        if let Some(Some(MessagingType::StandardIo)) = &self.message_output {
+            if self.logging_type.is_some() {
+                if let Some(logging_type) = self.logging_type.as_ref().unwrap() {
+                    if logging_type != &LoggingType::StderrOnly {
+                        Err(format!(
+                            "Cannot setup logging type: {:?}, when message output is: {:?}",
+                            logging_type,
+                            MessagingType::StandardIo
+                        ))?;
                     }
                 }
             }
         }
+
         Ok(())
     }
 }
 
 impl Runnable for Cmd {
-    fn bootstrap_cmd(&self, _process_dir: &PathBuf) -> Result<Cmd, String> {
+    fn bootstrap_cmd(&self, _process_dir: &Path) -> Result<Cmd, String> {
         Ok(self.clone())
     }
 }

@@ -77,7 +77,7 @@ async fn test_scripts_in_different_languages() {
     ];
 
     for script in scripts {
-        test_script(&handle, script, arg, &message).await;
+        test_script(&handle, script, arg, message).await;
     }
 }
 
@@ -103,7 +103,7 @@ async fn test_script(
         .unwrap();
 
     assert_eq!(2, stdout.len());
-    assert_eq!(format!("First Argument: {arg}"), *stdout.get(0).unwrap());
+    assert_eq!(format!("First Argument: {arg}"), *stdout.first().unwrap());
     assert_eq!(
         format!("Received: {message_to_sent}"),
         *stdout.get(1).unwrap()
@@ -115,7 +115,10 @@ async fn test_script(
         .unwrap();
 
     assert_eq!(1, errors.len());
-    assert_eq!(format!("Error: {message_to_sent}"), *errors.get(0).unwrap());
+    assert_eq!(
+        format!("Error: {message_to_sent}"),
+        *errors.first().unwrap()
+    );
 
     tokio::time::sleep(Duration::from_secs(1)).await;
 

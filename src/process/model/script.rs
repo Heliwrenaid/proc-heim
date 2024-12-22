@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use derive_builder::Builder;
 
@@ -95,8 +95,8 @@ pub struct Script {
 }
 
 impl Runnable for Script {
-    fn bootstrap_cmd(&self, process_dir: &PathBuf) -> Result<Cmd, String> {
-        let file_path = create_script_file(&self, &process_dir)?;
+    fn bootstrap_cmd(&self, process_dir: &Path) -> Result<Cmd, String> {
+        let file_path = create_script_file(self, process_dir)?;
         let (cmd, mut args) = self.lang.get_cmd_and_args(file_path);
 
         if let Some(arguments) = &self.args {
@@ -112,7 +112,7 @@ impl Runnable for Script {
     }
 }
 
-fn create_script_file(script: &Script, script_file_dir: &PathBuf) -> Result<String, String> {
+fn create_script_file(script: &Script, script_file_dir: &Path) -> Result<String, String> {
     let extension = script.lang.get_file_extension();
     let file_path = script_file_dir.join("script").with_extension(extension);
     std::fs::write(&file_path, &script.content).map_err(|err| err.to_string())?;

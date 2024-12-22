@@ -69,7 +69,7 @@ pub struct LogReader {
 }
 
 impl LogReader {
-    pub fn new(
+    pub fn spawn(
         logs_stdout: Option<PathBuf>,
         logs_stderr: Option<PathBuf>,
         logs_merged: Option<PathBuf>,

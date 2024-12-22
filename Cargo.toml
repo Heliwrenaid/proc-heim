@@ -30,6 +30,6 @@ proptest = "1.5.0"
 futures = "0.3.31"
 
 [features]
-default = []
+default = ["json", "message-pack"]
 json = ["dep:serde", "dep:serde_json"]
 message-pack = ["dep:serde", "dep:rmp-serde", "dep:hex", "dep:base64"]

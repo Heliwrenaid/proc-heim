@@ -59,7 +59,7 @@ pub struct ProcessManager {
 }
 
 impl ProcessManager {
-    pub fn new(working_dir: PathBuf) -> ProcessManagerHandle {
+    pub fn spawn(working_dir: PathBuf) -> ProcessManagerHandle {
         let (sender, receiver) = mpsc::channel(8);
         let mut manager = Self {
             process_spawner: ProcessSpawner::new(WorkingDir::new(working_dir)),
@@ -120,7 +120,7 @@ impl ProcessManager {
     ) -> Result<ProcessId, SpawnProcessError> {
         let id = ProcessId::random();
         let process = self.process_spawner.spawn_runnable(&id, runnable)?;
-        self.processes.insert(id.clone(), process);
+        self.processes.insert(id, process);
         Ok(id)
     }
 

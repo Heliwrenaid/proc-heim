@@ -39,6 +39,7 @@ mod inner {
         }
     }
 
+    #[allow(clippy::enum_variant_names)]
     #[derive(thiserror::Error, Debug)]
     pub enum SerdeError {
         #[error("Cannot serialize data with format: {0}. Cause: {1}")]
@@ -79,7 +80,7 @@ mod inner {
         ) -> Result<T, SerdeError> {
             match format {
                 #[cfg(feature = "json")]
-                DataFormat::Json => serde_json::from_slice(&bytes).map_err(|err| {
+                DataFormat::Json => serde_json::from_slice(bytes).map_err(|err| {
                     SerdeError::DeserializationError(format.clone(), err.to_string())
                 }),
                 #[cfg(feature = "message-pack")]

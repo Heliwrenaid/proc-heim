@@ -37,7 +37,7 @@ async fn check_logs_from_stdout(logging_type: LoggingType, should_logs_be_set: b
 
     let query = LogsQuery::default();
     let result = handle.get_logs_stdout(process_id, query).await;
-    assert_logs(result, &log, should_logs_be_set);
+    assert_logs(result, log, should_logs_be_set);
 }
 
 async fn check_logs_from_stderr(logging_type: LoggingType, should_logs_be_set: bool) {
@@ -50,7 +50,7 @@ async fn check_logs_from_stderr(logging_type: LoggingType, should_logs_be_set: b
 
     let query = LogsQuery::default();
     let result = handle.get_logs_stderr(process_id, query).await;
-    assert_logs(result, &log, should_logs_be_set);
+    assert_logs(result, log, should_logs_be_set);
 }
 
 fn assert_logs(
@@ -61,7 +61,7 @@ fn assert_logs(
     if should_logs_be_set {
         let logs = result.unwrap();
         assert_eq!(1, logs.len());
-        assert_eq!(expected_log, logs.get(0).unwrap());
+        assert_eq!(expected_log, logs.first().unwrap());
     } else {
         assert!(result.is_err());
 

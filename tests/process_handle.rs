@@ -36,7 +36,7 @@ async fn test_process_handle_wrapper() {
     let stdout = handle.get_logs_stdout(LogsQuery::default()).await.unwrap();
 
     assert_eq!(2, stdout.len());
-    assert_eq!(format!("First Argument: {arg}"), *stdout.get(0).unwrap());
+    assert_eq!(format!("First Argument: {arg}"), *stdout.first().unwrap());
     assert_eq!(
         format!("Received: {message_to_sent}"),
         *stdout.get(1).unwrap()
@@ -45,7 +45,10 @@ async fn test_process_handle_wrapper() {
     let errors = handle.get_logs_stderr(LogsQuery::default()).await.unwrap();
 
     assert_eq!(1, errors.len());
-    assert_eq!(format!("Error: {message_to_sent}"), *errors.get(0).unwrap());
+    assert_eq!(
+        format!("Error: {message_to_sent}"),
+        *errors.first().unwrap()
+    );
 
     tokio::time::sleep(Duration::from_secs(1)).await;
 

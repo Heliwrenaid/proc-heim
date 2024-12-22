@@ -26,7 +26,7 @@ pub struct MessageReader {
 }
 
 impl MessageReader {
-    pub fn new(
+    pub fn spawn(
         pipe_reader: Receiver,
         capacity: Option<usize>,
     ) -> Result<MessageReaderHandle, MessageReaderError> {
@@ -147,7 +147,7 @@ mod tests {
     #[tokio::test]
     async fn should_read_messages_from_pipe() {
         let (mut sender, receiver) = pipe::pipe().unwrap();
-        let reader = MessageReader::new(receiver, None).unwrap();
+        let reader = MessageReader::spawn(receiver, None).unwrap();
 
         let writer_handle = tokio::spawn(async move {
             sender.write_all(b"Message 1\n").await.unwrap();
@@ -169,7 +169,7 @@ mod tests {
     #[tokio::test]
     async fn should_read_messages_from_named_pipe() {
         let pipe = TestPipe::new();
-        let reader = MessageReader::new(pipe.reader(), None).unwrap();
+        let reader = MessageReader::spawn(pipe.reader(), None).unwrap();
 
         let mut writer = pipe.writer();
         let writer_handle = tokio::spawn(async move {
@@ -192,7 +192,7 @@ mod tests {
     #[tokio::test]
     async fn should_subscribe_multiple_times() {
         let pipe = TestPipe::new();
-        let reader = MessageReader::new(pipe.reader(), None).unwrap();
+        let reader = MessageReader::spawn(pipe.reader(), None).unwrap();
 
         let mut writer = pipe.writer();
         let writer_handle = tokio::spawn(async move {
@@ -218,7 +218,7 @@ mod tests {
     #[tokio::test]
     async fn should_abort_reader_process() {
         let pipe = TestPipe::new();
-        let reader = MessageReader::new(pipe.reader(), None).unwrap();
+        let reader = MessageReader::spawn(pipe.reader(), None).unwrap();
         reader.abort().await;
         assert!(reader.subscribe().await.is_err());
     }
@@ -227,13 +227,13 @@ mod tests {
     async fn should_return_err_when_capacity_is_invalid() {
         let pipe = TestPipe::new();
 
-        let result = MessageReader::new(pipe.reader(), Some(0));
+        let result = MessageReader::spawn(pipe.reader(), Some(0));
         assert!(matches!(
             result,
             Err(MessageReaderError::InvalidChannelCapacity(_))
         ));
 
-        let result = MessageReader::new(pipe.reader(), Some(usize::MAX / 2 + 1));
+        let result = MessageReader::spawn(pipe.reader(), Some(usize::MAX / 2 + 1));
         assert!(matches!(
             result,
             Err(MessageReaderError::InvalidChannelCapacity(_))

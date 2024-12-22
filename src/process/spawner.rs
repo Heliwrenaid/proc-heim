@@ -1,7 +1,7 @@
 use std::{
     fs::{self, File},
     io,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Stdio,
 };
 
@@ -38,7 +38,7 @@ impl ProcessSpawner {
     ) -> Result<Process, SpawnerError> {
         let process_dir = self.working_dir.process_dir(id);
         fs::create_dir(&process_dir).map_err(SpawnerError::CannotCreateProcessWorkingDir)?;
-        match self.try_spawn_runnable(id, &runnable, &process_dir) {
+        match self.try_spawn_runnable(id, &*runnable, &process_dir) {
             Ok(process) => Ok(process),
             Err(err) => {
                 let _ = fs::remove_dir_all(&process_dir);
@@ -51,11 +51,11 @@ impl ProcessSpawner {
     fn try_spawn_runnable(
         &self,
         id: &ProcessId,
-        runnable: &Box<dyn Runnable>,
-        process_dir: &PathBuf,
+        runnable: &dyn Runnable,
+        process_dir: &Path,
     ) -> Result<Process, SpawnerError> {
         let cmd = runnable
-            .bootstrap_cmd(&process_dir)
+            .bootstrap_cmd(process_dir)
             .map_err(SpawnerError::BootstrapProcessFailed)?;
         self.spawn(id, cmd)
     }
@@ -96,13 +96,13 @@ impl ProcessSpawner {
                     let output_pipe = self.working_dir.message_reader_pipe(id);
                     Self::create_named_pipe(&output_pipe)?;
                     child.env("OUTPUT_PIPE", output_pipe.clone());
-                    let receiver = unix::pipe::OpenOptions::new()
+                    unix::pipe::OpenOptions::new()
                         .read_write(true)
-                        .open_receiver(output_pipe)?;
-                    receiver
+                        .open_receiver(output_pipe)?
                 }
             };
-            let message_reader = MessageReader::new(receiver, cmd.options.output_buffer_capacity)?;
+            let message_reader =
+                MessageReader::spawn(receiver, cmd.options.output_buffer_capacity)?;
             process_builder = process_builder.message_reader(message_reader.into())
         }
 
@@ -117,13 +117,12 @@ impl ProcessSpawner {
                     let input_pipe = self.working_dir.message_writer_pipe(id);
                     Self::create_named_pipe(&input_pipe)?;
                     child.env("INPUT_PIPE", input_pipe.clone());
-                    let sender = unix::pipe::OpenOptions::new()
+                    unix::pipe::OpenOptions::new()
                         .read_write(true)
-                        .open_sender(input_pipe)?;
-                    sender
+                        .open_sender(input_pipe)?
                 }
             };
-            process_builder = process_builder.message_writer(MessageWriter::new(sender)?.into())
+            process_builder = process_builder.message_writer(MessageWriter::spawn(sender)?.into())
         }
 
         if let Some(ref logging_type) = cmd.options.logging_type {
@@ -132,14 +131,14 @@ impl ProcessSpawner {
                     let path = self.working_dir.logs_stdout(id);
                     let file = Self::create_log_file(&path)?;
                     child.stdout(file);
-                    let reader = LogReader::new(path.into(), None, None);
+                    let reader = LogReader::spawn(path.into(), None, None);
                     process_builder = process_builder.log_reader(reader.into());
                 }
                 LoggingType::StderrOnly => {
                     let path = self.working_dir.logs_stderr(id);
                     let file = Self::create_log_file(&path)?;
                     child.stderr(file);
-                    let reader = LogReader::new(None, path.into(), None);
+                    let reader = LogReader::spawn(None, path.into(), None);
                     process_builder = process_builder.log_reader(reader.into());
                 }
                 LoggingType::StdoutAndStderr => {
@@ -150,7 +149,7 @@ impl ProcessSpawner {
                     let stderr_path = self.working_dir.logs_stderr(id);
                     let file = Self::create_log_file(&stderr_path)?;
                     child.stderr(file);
-                    let reader = LogReader::new(stdout_path.into(), stderr_path.into(), None);
+                    let reader = LogReader::spawn(stdout_path.into(), stderr_path.into(), None);
                     process_builder = process_builder.log_reader(reader.into());
                 }
                 LoggingType::StdoutAndStderrMerged => {
@@ -159,7 +158,7 @@ impl ProcessSpawner {
                     let file2 = file1.try_clone()?;
                     child.stdout(file1);
                     child.stderr(file2);
-                    let reader = LogReader::new(None, None, path.into());
+                    let reader = LogReader::spawn(None, None, path.into());
                     process_builder = process_builder.log_reader(reader.into());
                 }
             }

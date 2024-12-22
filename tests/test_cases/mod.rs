@@ -7,10 +7,11 @@ use crate::common::create_process_manager;
 #[cfg(any(feature = "json", feature = "message-pack"))]
 use proc_heim::DataFormat;
 
+#[allow(dead_code)]
 pub async fn should_read_message<F: Fn(&str) -> Cmd>(cmd_with_message: F) {
     let (_dir, handle) = create_process_manager();
     let msg = "example message";
-    let process_id = handle.spawn(cmd_with_message(&msg)).await.unwrap();
+    let process_id = handle.spawn(cmd_with_message(msg)).await.unwrap();
 
     let mut stream = handle
         .subscribe_message_bytes_stream(process_id)
@@ -19,6 +20,7 @@ pub async fn should_read_message<F: Fn(&str) -> Cmd>(cmd_with_message: F) {
     assert_eq!(msg.as_bytes(), stream.next().await.unwrap().unwrap());
 }
 
+#[allow(dead_code)]
 pub async fn should_spawn_process_then_communicate_with_it_then_kill(cmd: Cmd) {
     let (_dir, handle) = create_process_manager();
     let process_id = handle.spawn(cmd).await.unwrap();
@@ -78,6 +80,7 @@ impl TryInto<Vec<u8>> for ExampleMessage {
     }
 }
 
+#[allow(dead_code)]
 pub async fn should_read_structured_message(cmd: Cmd, message: ExampleMessage) {
     let (_dir, handle) = create_process_manager();
     let process_id = handle.spawn(cmd).await.unwrap();
@@ -117,6 +120,7 @@ pub async fn should_read_message_with_format(
     assert_eq!(message, actual_message);
 }
 
+#[allow(dead_code)]
 pub async fn should_write_json_message_and_read_part_of_it<F: Fn(&str) -> Cmd>(cmd_with_arg: F) {
     let (_dir, handle) = create_process_manager();
     let process_id = handle.spawn(cmd_with_arg(".data1")).await.unwrap();

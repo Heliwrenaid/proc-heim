@@ -13,6 +13,7 @@ pub struct TestPipe {
     pub pipe_path: PathBuf,
 }
 
+#[allow(clippy::new_without_default)]
 impl TestPipe {
     pub fn new() -> Self {
         let tmp_dir = tempdir().unwrap();

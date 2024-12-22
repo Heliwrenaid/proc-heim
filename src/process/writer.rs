@@ -22,7 +22,7 @@ pub struct MessageWriter {
 }
 
 impl MessageWriter {
-    pub fn new(pipe_writer: pipe::Sender) -> Result<MessageWriterHandle, io::Error> {
+    pub fn spawn(pipe_writer: pipe::Sender) -> Result<MessageWriterHandle, io::Error> {
         let (sender, receiver) = mpsc::channel(8);
         let mut manager = Self {
             pipe_writer,
@@ -99,7 +99,7 @@ mod tests {
     #[tokio::test]
     async fn should_write_data_to_pipe() {
         let (sender, mut receiver) = pipe::pipe().unwrap();
-        let writer_handle = MessageWriter::new(sender).unwrap();
+        let writer_handle = MessageWriter::spawn(sender).unwrap();
         test_writing_data(&mut receiver, &writer_handle, b"Hello world\n").await;
         test_writing_data(&mut receiver, &writer_handle, b"Just a message\n").await;
     }
@@ -107,7 +107,7 @@ mod tests {
     #[tokio::test]
     async fn should_write_data_to_named_pipe() {
         let pipe = TestPipe::new();
-        let writer_handle = MessageWriter::new(pipe.writer()).unwrap();
+        let writer_handle = MessageWriter::spawn(pipe.writer()).unwrap();
         let mut reader = pipe.reader();
         test_writing_data(&mut reader, &writer_handle, b"Hello world\n").await;
         test_writing_data(&mut reader, &writer_handle, b"Next message: lorem ipsum\n").await;
@@ -128,7 +128,7 @@ mod tests {
     #[tokio::test]
     async fn should_abort_writer_process() {
         let pipe = TestPipe::new();
-        let writer = MessageWriter::new(pipe.writer()).unwrap();
+        let writer = MessageWriter::spawn(pipe.writer()).unwrap();
         writer.abort().await;
         tokio::time::sleep(Duration::from_secs(1)).await; // wait, because abort() returns immediately
         assert!(!writer.is_alive().await);
