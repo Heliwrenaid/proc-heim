@@ -1,4 +1,5 @@
 pub mod cmd_collection;
+pub mod scripts_collection;
 
 use std::path::PathBuf;
 

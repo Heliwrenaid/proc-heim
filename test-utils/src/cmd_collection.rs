@@ -51,7 +51,7 @@ pub mod std_io {
     }
 
     pub fn echo_daemon_script_path() -> PathBuf {
-        scripts_std_io().join("echo_daemon.sh")
+        scripts_std_io().join("echo_daemon.sh") // TODO: use as scripts?
     }
 
     pub fn echo_json_script() -> PathBuf {

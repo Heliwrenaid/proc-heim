@@ -1,6 +1,7 @@
 mod log_reader;
 mod manager;
 mod model;
+mod process_handle;
 mod reader;
 mod serde;
 mod spawner;
@@ -22,3 +23,5 @@ pub use model::{
     CustomScriptRunConfig, LoggingType, MessagingType, ProcessData, ProcessId, Runnable, Script,
     ScriptBuilder, ScriptBuilderError, ScriptLanguage, SCRIPT_FILE_PATH_PLACEHOLDER,
 };
+
+pub use process_handle::ProcessHandle;

@@ -9,7 +9,7 @@ use tokio_stream::{
     Stream, StreamExt,
 };
 
-use crate::{working_dir::WorkingDir, ProcessData, Runnable};
+use crate::{working_dir::WorkingDir, ProcessData, ProcessHandle, Runnable};
 
 use super::{
     log_reader::{LogReaderError, LogsQuery, LogsQueryType},
@@ -224,6 +224,14 @@ impl ProcessManagerHandle {
         let _ = self.sender.send(msg).await;
         let process_id = receiver.await??;
         Ok(process_id)
+    }
+
+    pub async fn spawn_with_handle(
+        &self,
+        runnable: impl Runnable,
+    ) -> Result<ProcessHandle, SpawnProcessError> {
+        let id = self.spawn(runnable).await?;
+        Ok(ProcessHandle::new(id, self.clone()))
     }
 
     pub async fn subscribe_message_bytes_stream(
