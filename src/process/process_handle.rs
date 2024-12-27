@@ -1,9 +1,12 @@
+use std::time::Duration;
+
 use crate::{
     GetLogsError, GetProcessDataError, KillProcessError, LogsQuery, ProcessData, ProcessId,
     ProcessManagerHandle, ReadMessageError, ReceiveMessageBytesError, ReceiveMessageError,
     WriteMessageError,
 };
 
+use tokio::task::JoinHandle;
 use tokio_stream::Stream;
 
 pub struct ProcessHandle {
@@ -50,6 +53,13 @@ impl ProcessHandle {
 
     pub async fn get_process_data(&self) -> Result<ProcessData, GetProcessDataError> {
         self.handle.get_process_data(self.id).await
+    }
+
+    pub async fn wait(
+        &self,
+        poll_interval: Duration,
+    ) -> JoinHandle<Result<ProcessData, GetProcessDataError>> {
+        self.handle.wait(self.id, poll_interval).await
     }
 }
 

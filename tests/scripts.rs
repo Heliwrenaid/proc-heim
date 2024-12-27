@@ -120,8 +120,11 @@ async fn test_script(
         *errors.first().unwrap()
     );
 
-    tokio::time::sleep(Duration::from_secs(1)).await;
-
-    let process_data = handle.get_process_data(id).await.unwrap();
+    let process_data = handle
+        .wait(id, Duration::from_millis(500))
+        .await
+        .await
+        .unwrap()
+        .unwrap();
     assert!(process_data.exit_status().unwrap().success());
 }

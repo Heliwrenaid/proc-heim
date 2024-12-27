@@ -32,8 +32,10 @@ async fn check_logs_from_stdout(logging_type: LoggingType, should_logs_be_set: b
     let log = "just an example log data";
     let cmd = echo_cmd_with_logging(log, logging_type);
     let process_id = handle.spawn(cmd).await.unwrap();
-
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    let _ = handle
+        .wait(process_id, Duration::from_millis(100))
+        .await
+        .await;
 
     let query = LogsQuery::default();
     let result = handle.get_logs_stdout(process_id, query).await;
@@ -46,7 +48,10 @@ async fn check_logs_from_stderr(logging_type: LoggingType, should_logs_be_set: b
     let cmd = echo_to_stderr_cmd_with_logging(log, logging_type);
     let process_id = handle.spawn(cmd).await.unwrap();
 
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    let _ = handle
+        .wait(process_id, Duration::from_millis(100))
+        .await
+        .await;
 
     let query = LogsQuery::default();
     let result = handle.get_logs_stderr(process_id, query).await;
@@ -95,7 +100,10 @@ async fn should_query_logs_with_offset_and_limit() {
     let cmd = echo_all_args_script(&expected_logs);
     let process_id = handle.spawn(cmd).await.unwrap();
 
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    let _ = handle
+        .wait(process_id, Duration::from_millis(100))
+        .await
+        .await;
 
     let query = LogsQuery::new(None, Some(2));
     let logs = handle.get_logs_stdout(process_id, query).await.unwrap();

@@ -1,8 +1,8 @@
-use std::{collections::HashMap, io, path::PathBuf};
+use std::{collections::HashMap, io, path::PathBuf, time::Duration};
 
-use tokio::sync::{
-    broadcast::{self},
-    mpsc, oneshot,
+use tokio::{
+    sync::{broadcast, mpsc, oneshot},
+    task::JoinHandle,
 };
 use tokio_stream::{
     wrappers::{errors::BroadcastStreamRecvError, BroadcastStream},
@@ -354,6 +354,24 @@ impl ProcessManagerHandle {
         let _ = self.sender.send(msg).await;
         let data = receiver.await??;
         Ok(data)
+    }
+
+    pub async fn wait(
+        &self,
+        id: ProcessId,
+        poll_interval: Duration,
+    ) -> JoinHandle<Result<ProcessData, GetProcessDataError>> {
+        let handle = self.clone();
+        tokio::spawn(async move {
+            loop {
+                let process_data = handle.get_process_data(id).await?;
+                if process_data.is_running() {
+                    tokio::time::sleep(poll_interval).await;
+                } else {
+                    return Ok(process_data);
+                }
+            }
+        })
     }
 }
 
