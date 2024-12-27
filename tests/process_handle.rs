@@ -24,8 +24,6 @@ async fn test_process_handle_wrapper() {
         .await
         .unwrap();
 
-    tokio::time::sleep(Duration::from_secs(1)).await; // TODO: we must sleep for process to spawn? Maybe should buffer messages in writer?
-
     handle.write_message(message_to_sent).await.unwrap();
 
     let mut stream = handle.subscribe_message_bytes_stream().await.unwrap();

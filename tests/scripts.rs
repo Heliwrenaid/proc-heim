@@ -88,7 +88,6 @@ async fn test_script(
     message_to_sent: &str,
 ) {
     let id = handle.spawn(script.clone()).await.unwrap();
-    tokio::time::sleep(Duration::from_secs(1)).await;
 
     handle.write_message(id, message_to_sent).await.unwrap();
 
