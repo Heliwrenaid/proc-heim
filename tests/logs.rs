@@ -32,12 +32,9 @@ async fn check_logs_from_stdout(logging_type: LoggingType, should_logs_be_set: b
     let log = "just an example log data";
     let cmd = echo_cmd_with_logging(log, logging_type);
     let process_id = handle.spawn(cmd).await.unwrap();
-    let _ = handle
-        .wait(process_id, Duration::from_millis(100))
-        .await
-        .await;
+    let _ = handle.wait(process_id, Duration::from_millis(100)).await;
 
-    let query = LogsQuery::default();
+    let query = LogsQuery::fetch_all();
     let result = handle.get_logs_stdout(process_id, query).await;
     assert_logs(result, log, should_logs_be_set);
 }
@@ -48,12 +45,9 @@ async fn check_logs_from_stderr(logging_type: LoggingType, should_logs_be_set: b
     let cmd = echo_to_stderr_cmd_with_logging(log, logging_type);
     let process_id = handle.spawn(cmd).await.unwrap();
 
-    let _ = handle
-        .wait(process_id, Duration::from_millis(100))
-        .await
-        .await;
+    let _ = handle.wait(process_id, Duration::from_millis(100)).await;
 
-    let query = LogsQuery::default();
+    let query = LogsQuery::fetch_all();
     let result = handle.get_logs_stderr(process_id, query).await;
     assert_logs(result, log, should_logs_be_set);
 }
@@ -100,52 +94,49 @@ async fn should_query_logs_with_offset_and_limit() {
     let cmd = echo_all_args_script(&expected_logs);
     let process_id = handle.spawn(cmd).await.unwrap();
 
-    let _ = handle
-        .wait(process_id, Duration::from_millis(100))
-        .await
-        .await;
+    let _ = handle.wait(process_id, Duration::from_millis(100)).await;
 
-    let query = LogsQuery::new(None, Some(2));
+    let query = LogsQuery::with_limit(2);
     let logs = handle.get_logs_stdout(process_id, query).await.unwrap();
     assert_eq!(expected_logs[0..2], logs);
 
-    let query = LogsQuery::new(Some(3), None);
+    let query = LogsQuery::with_offset(3);
     let logs = handle.get_logs_stdout(process_id, query).await.unwrap();
     assert_eq!(expected_logs[3..10], logs);
 
-    let query = LogsQuery::new(Some(0), Some(2));
+    let query = LogsQuery::with_offset_and_limit(0, 2);
     let logs = handle.get_logs_stdout(process_id, query).await.unwrap();
     assert_eq!(expected_logs[0..2], logs);
 
-    let query = LogsQuery::new(Some(1), Some(2));
+    let query = LogsQuery::with_offset_and_limit(1, 2);
     let logs = handle.get_logs_stdout(process_id, query).await.unwrap();
     assert_eq!(expected_logs[1..3], logs);
 
-    let query = LogsQuery::new(Some(5), Some(4));
+    let query = LogsQuery::with_offset_and_limit(5, 4);
     let logs = handle.get_logs_stdout(process_id, query).await.unwrap();
     assert_eq!(expected_logs[5..9], logs);
 
-    let query = LogsQuery::new(Some(5), Some(20));
+    let query = LogsQuery::with_offset_and_limit(5, 20);
     let logs = handle.get_logs_stdout(process_id, query).await.unwrap();
     assert_eq!(expected_logs[5..10], logs);
 
-    let query = LogsQuery::new(Some(9), Some(20));
+    let query = LogsQuery::with_offset_and_limit(9, 20);
     let logs = handle.get_logs_stdout(process_id, query).await.unwrap();
     assert_eq!(expected_logs[9..10], logs);
 
-    let query = LogsQuery::new(Some(10), Some(1));
+    let query = LogsQuery::with_offset_and_limit(10, 1);
     let logs = handle.get_logs_stdout(process_id, query).await.unwrap();
     assert!(logs.is_empty());
 
-    let query = LogsQuery::new(Some(11), Some(1));
+    let query = LogsQuery::with_offset_and_limit(11, 1);
     let logs = handle.get_logs_stdout(process_id, query).await.unwrap();
     assert!(logs.is_empty());
 
-    let query = LogsQuery::new(Some(11), Some(0));
+    let query = LogsQuery::with_offset_and_limit(11, 0);
     let logs = handle.get_logs_stdout(process_id, query).await.unwrap();
     assert!(logs.is_empty());
 
-    let query = LogsQuery::new(Some(2), Some(0));
+    let query = LogsQuery::with_offset_and_limit(2, 0);
     let logs = handle.get_logs_stdout(process_id, query).await.unwrap();
     assert!(logs.is_empty());
 }

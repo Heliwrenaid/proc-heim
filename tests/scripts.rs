@@ -17,11 +17,8 @@ mod common;
 async fn should_run_custom_script() {
     let (dir, handle) = create_process_manager();
 
-    let run_config = CustomScriptRunConfig::new(
-        "bash",
-        vec!["-C".into(), SCRIPT_FILE_PATH_PLACEHOLDER.into()],
-        "sh",
-    );
+    let run_config =
+        CustomScriptRunConfig::new("bash", vec!["-C", SCRIPT_FILE_PATH_PLACEHOLDER], "sh");
     let arg = Uuid::new_v4().to_string();
     let script = ScriptBuilder::default()
         .lang(ScriptLanguage::Other(run_config))
@@ -57,6 +54,7 @@ async fn should_run_custom_script() {
     );
 }
 
+// TODO: should test also messaging via StandardIo
 #[tokio::test]
 async fn test_scripts_in_different_languages() {
     let (_dir, handle) = create_process_manager();
@@ -97,7 +95,7 @@ async fn test_script(
     assert!(stream.next().now_or_never().is_none());
 
     let stdout = handle
-        .get_logs_stdout(id, LogsQuery::default())
+        .get_logs_stdout(id, LogsQuery::fetch_all())
         .await
         .unwrap();
 
@@ -109,7 +107,7 @@ async fn test_script(
     );
 
     let errors = handle
-        .get_logs_stderr(id, LogsQuery::default())
+        .get_logs_stderr(id, LogsQuery::fetch_all())
         .await
         .unwrap();
 
@@ -121,7 +119,6 @@ async fn test_script(
 
     let process_data = handle
         .wait(id, Duration::from_millis(500))
-        .await
         .await
         .unwrap()
         .unwrap();

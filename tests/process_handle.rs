@@ -26,12 +26,15 @@ async fn test_process_handle_wrapper() {
 
     handle.write_message(message_to_sent).await.unwrap();
 
-    let mut stream = handle.subscribe_message_bytes_stream().await.unwrap();
+    let mut stream = handle.subscribe_message_string_stream().await.unwrap();
     let message = stream.try_next().await.unwrap().unwrap();
-    assert_eq!(message_to_sent.as_bytes(), message);
+    assert_eq!(message_to_sent, message);
     assert!(stream.next().now_or_never().is_none());
 
-    let stdout = handle.get_logs_stdout(LogsQuery::default()).await.unwrap();
+    let stdout = handle
+        .get_logs_stdout(LogsQuery::fetch_all())
+        .await
+        .unwrap();
 
     assert_eq!(2, stdout.len());
     assert_eq!(format!("First Argument: {arg}"), *stdout.first().unwrap());
@@ -40,7 +43,10 @@ async fn test_process_handle_wrapper() {
         *stdout.get(1).unwrap()
     );
 
-    let errors = handle.get_logs_stderr(LogsQuery::default()).await.unwrap();
+    let errors = handle
+        .get_logs_stderr(LogsQuery::fetch_all())
+        .await
+        .unwrap();
 
     assert_eq!(1, errors.len());
     assert_eq!(
@@ -50,7 +56,6 @@ async fn test_process_handle_wrapper() {
 
     let process_data = handle
         .wait(Duration::from_millis(500))
-        .await
         .await
         .unwrap()
         .unwrap();
@@ -90,7 +95,7 @@ async fn should_write_and_read_json() {
             echo "$msg"
             "#,
         )
-        .options(CmdOptions::std_io())
+        .options(CmdOptions::standard_io())
         .build()
         .unwrap();
     let handle = manager_handle.spawn_with_handle(script).await.unwrap();
@@ -124,7 +129,6 @@ async fn should_wait_for_process_completion() {
 
     let data = handle
         .wait(Duration::from_micros(100))
-        .await
         .await
         .unwrap()
         .unwrap();

@@ -26,6 +26,12 @@ impl ProcessHandle {
         self.handle.subscribe_message_bytes_stream(self.id).await
     }
 
+    pub async fn subscribe_message_string_stream(
+        &self,
+    ) -> Result<impl Stream<Item = Result<String, ReceiveMessageError>>, ReadMessageError> {
+        self.handle.subscribe_message_string_stream(self.id).await
+    }
+
     pub async fn subscribe_message_stream<T: TryFrom<Vec<u8>>>(
         &self,
     ) -> Result<impl Stream<Item = Result<T, ReceiveMessageError>>, ReadMessageError> {
@@ -55,11 +61,11 @@ impl ProcessHandle {
         self.handle.get_process_data(self.id).await
     }
 
-    pub async fn wait(
+    pub fn wait(
         &self,
         poll_interval: Duration,
     ) -> JoinHandle<Result<ProcessData, GetProcessDataError>> {
-        self.handle.wait(self.id, poll_interval).await
+        self.handle.wait(self.id, poll_interval)
     }
 }
 

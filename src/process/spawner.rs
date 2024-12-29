@@ -75,6 +75,12 @@ impl ProcessSpawner {
             child.env_clear();
         }
 
+        if let Some(envs) = cmd.options.envs_to_remove {
+            for env in envs {
+                child.env_remove(env);
+            }
+        }
+
         if let Some(envs) = cmd.options.envs {
             child.envs(envs);
         }

@@ -268,6 +268,27 @@ impl ProcessManagerHandle {
         })
     }
 
+    pub async fn subscribe_message_string_stream(
+        &self,
+        id: ProcessId,
+    ) -> Result<impl Stream<Item = Result<String, ReceiveMessageError>>, ReadMessageError> {
+        Ok(self
+            .subscribe_message_bytes_stream(id)
+            .await?
+            .map(Self::to_string_message))
+    }
+
+    fn to_string_message(
+        bytes: Result<Vec<u8>, ReceiveMessageBytesError>,
+    ) -> Result<String, ReceiveMessageError> {
+        let bytes = bytes?;
+        String::from_utf8(bytes).map_err(|_| {
+            ReceiveMessageError::CannotDeserializeMessage(
+                "Cannot deserialize data from raw bytes to string".into(),
+            )
+        })
+    }
+
     pub async fn write_message<T: TryInto<Vec<u8>>>(
         &self,
         id: ProcessId,
@@ -356,7 +377,7 @@ impl ProcessManagerHandle {
         Ok(data)
     }
 
-    pub async fn wait(
+    pub fn wait(
         &self,
         id: ProcessId,
         poll_interval: Duration,

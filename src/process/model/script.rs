@@ -57,15 +57,21 @@ pub struct CustomScriptRunConfig {
 }
 
 impl CustomScriptRunConfig {
-    pub fn new(cmd: &str, args: Vec<String>, file_extension: &str) -> Self {
+    pub fn new<C, T, I, F>(cmd: C, args: I, file_extension: F) -> Self
+    where
+        C: Into<String>,
+        T: Into<String>,
+        I: IntoIterator<Item = T>,
+        F: Into<String>,
+    {
         Self {
             cmd: cmd.into(),
-            args,
+            args: args.into_iter().map(Into::into).collect(),
             file_extension: file_extension.into(),
         }
     }
 
-    pub fn get_cmd_and_args(&self, file_path: &str) -> (&str, Vec<String>) {
+    pub(crate) fn get_cmd_and_args(&self, file_path: &str) -> (&str, Vec<String>) {
         let args = self
             .args
             .iter()
@@ -85,13 +91,95 @@ impl CustomScriptRunConfig {
 #[derive(Debug, Clone, Builder)]
 pub struct Script {
     #[builder(setter(into))]
-    pub lang: ScriptLanguage,
+    pub(crate) lang: ScriptLanguage,
     #[builder(setter(into))]
-    pub content: String,
+    pub(crate) content: String,
     #[builder(setter(into, strip_option), default)]
-    pub args: Option<Vec<String>>,
+    pub(crate) args: Option<Vec<String>>,
     #[builder(setter(into), default)]
-    pub options: CmdOptions,
+    pub(crate) options: CmdOptions,
+}
+
+impl Script {
+    pub fn new<S>(lang: ScriptLanguage, content: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self {
+            lang,
+            content: content.into(),
+            args: None,
+            options: CmdOptions::default(),
+        }
+    }
+
+    pub fn with_args<S, T, I>(lang: ScriptLanguage, content: S, args: I) -> Self
+    where
+        S: Into<String>,
+        T: Into<String>,
+        I: IntoIterator<Item = S>,
+    {
+        Self {
+            lang,
+            content: content.into(),
+            args: Some(args.into_iter().map(Into::into).collect()),
+            options: CmdOptions::default(),
+        }
+    }
+
+    pub fn with_options<S>(lang: ScriptLanguage, content: S, options: CmdOptions) -> Self
+    where
+        S: Into<String>,
+    {
+        Self {
+            lang,
+            content: content.into(),
+            args: None,
+            options,
+        }
+    }
+
+    pub fn with_args_and_option<S, T, I>(
+        lang: ScriptLanguage,
+        content: S,
+        args: I,
+        options: CmdOptions,
+    ) -> Self
+    where
+        S: Into<String>,
+        T: Into<String>,
+        I: IntoIterator<Item = T>,
+    {
+        Self {
+            lang,
+            content: content.into(),
+            args: Some(args.into_iter().map(Into::into).collect()),
+            options,
+        }
+    }
+
+    pub fn set_args<S, I>(&mut self, args: I)
+    where
+        S: Into<String>,
+        I: IntoIterator<Item = S>,
+    {
+        self.args = Some(args.into_iter().map(Into::into).collect());
+    }
+
+    pub fn set_options(&mut self, options: CmdOptions) {
+        self.options = options;
+    }
+
+    pub fn add_arg<S>(&mut self, arg: S)
+    where
+        S: Into<String>,
+    {
+        self.args.get_or_insert(Vec::new()).push(arg.into());
+    }
+
+    pub fn get_mut_options(&mut self) -> &mut CmdOptions {
+        &mut self.options
+    }
 }
 
 impl Runnable for Script {

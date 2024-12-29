@@ -10,17 +10,38 @@ use tokio::{
 };
 use tokio_stream::{wrappers::LinesStream, StreamExt as TokioStreamExt};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct LogsQuery {
     offset: usize,
     limit: Option<usize>,
 }
 
 impl LogsQuery {
-    pub fn new(offset: Option<usize>, limit: Option<usize>) -> Self {
+    pub fn fetch_all() -> Self {
         Self {
-            offset: offset.unwrap_or(0),
-            limit,
+            offset: 0,
+            limit: None,
+        }
+    }
+
+    pub fn with_limit(limit: usize) -> Self {
+        Self {
+            offset: 0,
+            limit: limit.into(),
+        }
+    }
+
+    pub fn with_offset(offset: usize) -> Self {
+        Self {
+            offset,
+            limit: None,
+        }
+    }
+
+    pub fn with_offset_and_limit(offset: usize, limit: usize) -> Self {
+        Self {
+            offset,
+            limit: limit.into(),
         }
     }
 }
