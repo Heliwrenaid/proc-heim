@@ -109,7 +109,7 @@ impl ProcessSpawner {
             };
             let message_reader =
                 MessageReader::spawn(receiver, cmd.options.output_buffer_capacity)?;
-            process_builder = process_builder.message_reader(message_reader.into())
+            process_builder.message_reader = message_reader.into();
         }
 
         if let Some(messaging_type) = cmd.options.message_input {
@@ -128,7 +128,7 @@ impl ProcessSpawner {
                         .open_sender(input_pipe)?
                 }
             };
-            process_builder = process_builder.message_writer(MessageWriter::spawn(sender)?.into())
+            process_builder.message_writer = MessageWriter::spawn(sender)?.into()
         }
 
         if let Some(ref logging_type) = cmd.options.logging_type {
@@ -138,14 +138,14 @@ impl ProcessSpawner {
                     let file = Self::create_log_file(&path)?;
                     child.stdout(file);
                     let reader = LogReader::spawn(path.into(), None, None);
-                    process_builder = process_builder.log_reader(reader.into());
+                    process_builder.log_reader = reader.into();
                 }
                 LoggingType::StderrOnly => {
                     let path = self.working_dir.logs_stderr(id);
                     let file = Self::create_log_file(&path)?;
                     child.stderr(file);
                     let reader = LogReader::spawn(None, path.into(), None);
-                    process_builder = process_builder.log_reader(reader.into());
+                    process_builder.log_reader = reader.into();
                 }
                 LoggingType::StdoutAndStderr => {
                     let stdout_path = self.working_dir.logs_stdout(id);
@@ -156,7 +156,7 @@ impl ProcessSpawner {
                     let file = Self::create_log_file(&stderr_path)?;
                     child.stderr(file);
                     let reader = LogReader::spawn(stdout_path.into(), stderr_path.into(), None);
-                    process_builder = process_builder.log_reader(reader.into());
+                    process_builder.log_reader = reader.into();
                 }
                 LoggingType::StdoutAndStderrMerged => {
                     let path = self.working_dir.logs_merged(id);
@@ -165,14 +165,13 @@ impl ProcessSpawner {
                     child.stdout(file1);
                     child.stderr(file2);
                     let reader = LogReader::spawn(None, None, path.into());
-                    process_builder = process_builder.log_reader(reader.into());
+                    process_builder.log_reader = reader.into();
                 }
             }
         }
 
         let child_handle = child.spawn()?;
-
-        Ok(process_builder.child(child_handle).build().unwrap())
+        Ok(process_builder.build(child_handle))
     }
 
     fn create_named_pipe(pipe_path: &PathBuf) -> Result<(), SpawnerError> {
@@ -214,7 +213,7 @@ impl From<MessageReaderError> for SpawnerError {
 mod tests {
     use std::time::Duration;
 
-    use crate::{process::log_reader::LogSettingsQuery, CmdBuilder, CmdOptionsBuilder};
+    use crate::{process::log_reader::LogSettingsQuery, CmdOptions};
 
     use super::*;
 
@@ -306,21 +305,15 @@ mod tests {
     }
 
     fn cat_cmd() -> Cmd {
-        CmdBuilder::default().cmd("cat").build().unwrap()
+        Cmd::new("cat")
     }
 
     fn echo_cmd(logging_type: LoggingType) -> Cmd {
-        CmdBuilder::default()
-            .cmd("echo")
-            .args(vec!["-n".into(), "message".into()])
-            .options(
-                CmdOptionsBuilder::default()
-                    .logging_type(logging_type)
-                    .build()
-                    .unwrap(),
-            )
-            .build()
-            .unwrap()
+        Cmd::with_args_and_options(
+            "echo",
+            ["-n", "message"],
+            CmdOptions::with_logging(logging_type),
+        )
     }
 
     // TODO: test setting other props and error handling

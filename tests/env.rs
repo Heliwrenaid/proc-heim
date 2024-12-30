@@ -13,7 +13,7 @@ async fn should_get_inherited_variable() {
 
     env::set_var(env_name, env_value);
 
-    let cmd = get_env_cmd(&env_name);
+    let cmd = get_env_cmd(env_name);
     let actual_env_value = spawn_and_read_message(cmd).await;
     assert_eq!(env_value, actual_env_value.unwrap());
 }
@@ -23,7 +23,7 @@ async fn should_set_environment_variable() {
     let env_name = "TEST_VAR";
     let env_value = "some text";
 
-    let mut cmd = get_env_cmd(&env_name);
+    let mut cmd = get_env_cmd(env_name);
     cmd.get_mut_options().add_env(env_name, env_value);
     let actual_env_value = spawn_and_read_message(cmd).await;
 
@@ -49,7 +49,7 @@ async fn should_remove_environment_variable() {
 
     env::set_var(env_name, env_value);
 
-    let mut cmd = get_env_cmd(&env_name);
+    let mut cmd = get_env_cmd(env_name);
     cmd.get_mut_options().remove_env(env_name);
     let actual_env_value = spawn_and_read_message(cmd).await;
 
@@ -61,7 +61,7 @@ async fn should_update_environment_variable() {
     let env_name = "PATH";
     let env_value_old = env!("PATH");
     let env_value_new = format!("{env_value_old}:/some/dir");
-    let mut cmd = get_env_cmd(&env_name);
+    let mut cmd = get_env_cmd(env_name);
     cmd.get_mut_options().add_env(env_name, &env_value_new);
     let actual_env_value = spawn_and_read_message(cmd).await;
 
@@ -81,5 +81,5 @@ async fn spawn_and_read_message(runnable: impl Runnable) -> Option<String> {
         .get_logs_stdout(LogsQuery::fetch_all())
         .await
         .unwrap();
-    logs.get(0).map(|s| s.to_owned())
+    logs.first().map(|s| s.to_owned())
 }

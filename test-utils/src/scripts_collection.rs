@@ -1,22 +1,11 @@
-use proc_heim::{
-    CmdOptionsBuilder, LoggingType, MessagingType, Script, ScriptBuilder, ScriptLanguage,
-};
+use proc_heim::{CmdOptions, LoggingType, Script, ScriptLanguage};
 
 pub fn build_echo_script(lang: ScriptLanguage, script: &str, args: &[String]) -> Script {
-    ScriptBuilder::default()
-        .lang(lang)
-        .content(script)
-        .args(args)
-        .options(
-            CmdOptionsBuilder::default()
-                .message_input(MessagingType::NamedPipe)
-                .message_output(MessagingType::NamedPipe)
-                .logging_type(LoggingType::StdoutAndStderr)
-                .build()
-                .unwrap(),
-        )
-        .build()
-        .unwrap()
+    let mut options = CmdOptions::named_pipe();
+    options
+        .set_logging_type(LoggingType::StdoutAndStderr)
+        .unwrap();
+    Script::with_args_and_option(lang, script, args, options)
 }
 
 pub const BASH_ECHO_SCRIPT: &str = r#"

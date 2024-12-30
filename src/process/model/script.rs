@@ -1,8 +1,7 @@
-use std::path::Path;
-
-use derive_builder::Builder;
-
 use crate::{Cmd, CmdOptions, Runnable};
+#[cfg(feature = "builder")]
+use derive_builder::Builder;
+use std::path::Path;
 
 pub const SCRIPT_FILE_PATH_PLACEHOLDER: &str = "$FILE_PATH";
 
@@ -88,6 +87,16 @@ impl CustomScriptRunConfig {
     }
 }
 
+#[cfg(not(feature = "builder"))]
+#[derive(Debug, Clone)]
+pub struct Script {
+    pub(crate) lang: ScriptLanguage,
+    pub(crate) content: String,
+    pub(crate) args: Option<Vec<String>>,
+    pub(crate) options: CmdOptions,
+}
+
+#[cfg(feature = "builder")]
 #[derive(Debug, Clone, Builder)]
 pub struct Script {
     #[builder(setter(into))]

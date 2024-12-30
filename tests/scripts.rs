@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use futures::future::FutureExt as _;
 use proc_heim::{
-    CmdOptionsBuilder, CustomScriptRunConfig, LogsQuery, MessagingType, ProcessManagerHandle,
-    Script, ScriptBuilder, ScriptLanguage, SCRIPT_FILE_PATH_PLACEHOLDER,
+    CmdOptions, CustomScriptRunConfig, LogsQuery, MessagingType, ProcessManagerHandle, Script,
+    ScriptLanguage, SCRIPT_FILE_PATH_PLACEHOLDER,
 };
 use tokio_stream::StreamExt;
 use uuid::Uuid;
@@ -20,25 +20,20 @@ async fn should_run_custom_script() {
     let run_config =
         CustomScriptRunConfig::new("bash", vec!["-C", SCRIPT_FILE_PATH_PLACEHOLDER], "sh");
     let arg = Uuid::new_v4().to_string();
-    let script = ScriptBuilder::default()
-        .lang(ScriptLanguage::Other(run_config))
-        .content(
-            r#"
-                dir="$(pwd)/$1"
-                mkdir $dir
-                echo $dir
-            "#,
-        )
-        .args(vec![arg.to_owned()])
-        .options(
-            CmdOptionsBuilder::default()
-                .message_output(MessagingType::StandardIo)
-                .current_dir(dir.path())
-                .build()
-                .unwrap(),
-        )
-        .build()
-        .unwrap();
+
+    let mut options = CmdOptions::with_message_output(MessagingType::StandardIo);
+    options.set_current_dir(dir.path().into());
+
+    let script = Script::with_args_and_option(
+        ScriptLanguage::Other(run_config),
+        r#"
+        dir="$(pwd)/$1"
+        mkdir $dir
+        echo $dir
+        "#,
+        [&arg],
+        options,
+    );
 
     let id = handle.spawn(script).await.unwrap();
     let mut stream = handle.subscribe_message_bytes_stream(id).await.unwrap();

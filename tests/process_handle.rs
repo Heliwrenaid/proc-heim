@@ -1,13 +1,18 @@
 use std::time::Duration;
 
-use crate::{common::create_process_manager, test_cases::ExampleMessage};
+use crate::common::create_process_manager;
 use futures::FutureExt;
-use proc_heim::{CmdOptions, GetProcessDataError, LogsQuery, ScriptBuilder, ScriptLanguage};
+use proc_heim::{GetProcessDataError, LogsQuery, ScriptLanguage};
 use test_utils::{cmd_collection::std_io::echo_cmd, scripts_collection::*};
 use tokio_stream::StreamExt;
 
 mod common;
 mod test_cases;
+
+#[cfg(feature = "json")]
+use crate::test_cases::ExampleMessage;
+#[cfg(feature = "json")]
+use proc_heim::CmdOptions;
 
 #[tokio::test]
 async fn test_process_handle_wrapper() {
@@ -84,20 +89,17 @@ async fn should_kill_process() {
 #[cfg(feature = "json")]
 #[tokio::test]
 async fn should_write_and_read_json() {
-    use proc_heim::DataFormat;
+    use proc_heim::{DataFormat, Script};
 
     let (_dir, manager_handle) = create_process_manager();
-    let script = ScriptBuilder::default()
-        .lang(ScriptLanguage::Bash)
-        .content(
-            r#"
+    let script = Script::with_options(
+        ScriptLanguage::Bash,
+        r#"
             read msg < /dev/stdin
             echo "$msg"
             "#,
-        )
-        .options(CmdOptions::standard_io())
-        .build()
-        .unwrap();
+        CmdOptions::standard_io(),
+    );
     let handle = manager_handle.spawn_with_handle(script).await.unwrap();
 
     let data1 = "Some message";

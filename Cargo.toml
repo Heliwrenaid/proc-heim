@@ -7,7 +7,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-derive_builder = "0.20.2"
+derive_builder = { version = "0.20.2", optional = true }
 tokio = { version = "1.41.0", features = ["full"] }
 uuid = { version = "1.11.0", features = ["v4", "fast-rng"] }
 bytes = "1"
@@ -30,6 +30,7 @@ proptest = "1.5.0"
 futures = "0.3.31"
 
 [features]
-default = ["json", "message-pack"]
+default = []
+builder = ["dep:derive_builder"]
 json = ["dep:serde", "dep:serde_json"]
 message-pack = ["dep:serde", "dep:rmp-serde", "dep:hex", "dep:base64"]

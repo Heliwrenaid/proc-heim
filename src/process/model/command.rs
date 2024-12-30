@@ -3,17 +3,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use derive_builder::Builder;
-
 use crate::Runnable;
 
-#[derive(Debug, Clone, Builder)]
+#[cfg(not(feature = "builder"))]
+#[derive(Debug, Clone)]
 pub struct Cmd {
-    #[builder(setter(into))]
     pub(crate) cmd: String,
-    #[builder(setter(into, strip_option), default)]
     pub(crate) args: Option<Vec<String>>,
-    #[builder(setter(into), default)]
     pub(crate) options: CmdOptions,
 }
 
@@ -90,24 +86,16 @@ impl Cmd {
     }
 }
 
-#[derive(Debug, Clone, Builder, Default)]
-#[builder(build_fn(validate = "Self::validate"))]
+#[cfg(not(feature = "builder"))]
+#[derive(Debug, Clone, Default)]
 pub struct CmdOptions {
-    #[builder(setter(into, strip_option), default)]
     pub(crate) current_dir: Option<PathBuf>,
-    #[builder(setter(into, strip_option), default = "false")]
     pub(crate) clear_envs: bool,
-    #[builder(setter(into, strip_option), default)]
     pub(crate) envs: Option<HashMap<String, String>>,
-    #[builder(setter(into, strip_option), default)]
     pub(crate) envs_to_remove: Option<Vec<String>>,
-    #[builder(setter(into, strip_option), default)]
     pub(crate) output_buffer_capacity: Option<usize>,
-    #[builder(setter(into, strip_option), default)]
     pub(crate) message_input: Option<MessagingType>,
-    #[builder(setter(into, strip_option), default)]
     pub(crate) message_output: Option<MessagingType>,
-    #[builder(setter(into, strip_option), default)]
     pub(crate) logging_type: Option<LoggingType>,
 }
 
@@ -121,11 +109,11 @@ impl CmdOptions {
     }
 
     fn with_same_in_out(messaging_type: MessagingType) -> CmdOptions {
-        CmdOptionsBuilder::default()
-            .message_input(messaging_type.clone())
-            .message_output(messaging_type)
-            .build()
-            .unwrap()
+        CmdOptions {
+            message_input: messaging_type.clone().into(),
+            message_output: messaging_type.into(),
+            ..Default::default()
+        }
     }
 
     pub fn with_message_input(message_input: MessagingType) -> Self {
@@ -252,20 +240,60 @@ pub enum LoggingType {
     StdoutAndStderrMerged,
 }
 
-impl CmdOptionsBuilder {
-    fn validate(&self) -> Result<(), String> {
-        if let (Some(message_output), Some(logging_type)) =
-            (self.message_output.as_ref(), self.logging_type.as_ref())
-        {
-            validate_stdout_config(message_output.as_ref(), logging_type.as_ref())
-                .map_err(|err| err.to_string())?;
-        }
-        Ok(())
-    }
-}
-
 impl Runnable for Cmd {
     fn bootstrap_cmd(&self, _process_dir: &Path) -> Result<Cmd, String> {
         Ok(self.clone())
+    }
+}
+
+#[cfg(feature = "builder")]
+pub use builder::*;
+
+#[cfg(feature = "builder")]
+pub mod builder {
+    use super::*;
+    use derive_builder::Builder;
+
+    #[derive(Debug, Clone, Builder)]
+    pub struct Cmd {
+        #[builder(setter(into))]
+        pub(crate) cmd: String,
+        #[builder(setter(into, strip_option), default)]
+        pub(crate) args: Option<Vec<String>>,
+        #[builder(setter(into), default)]
+        pub(crate) options: CmdOptions,
+    }
+
+    #[derive(Debug, Clone, Default, Builder)]
+    #[builder(build_fn(validate = "Self::validate"))]
+    pub struct CmdOptions {
+        #[builder(setter(into, strip_option), default)]
+        pub(crate) current_dir: Option<PathBuf>,
+        #[builder(setter(into, strip_option), default = "false")]
+        pub(crate) clear_envs: bool,
+        #[builder(setter(into, strip_option), default)]
+        pub(crate) envs: Option<HashMap<String, String>>,
+        #[builder(setter(into, strip_option), default)]
+        pub(crate) envs_to_remove: Option<Vec<String>>,
+        #[builder(setter(into, strip_option), default)]
+        pub(crate) output_buffer_capacity: Option<usize>,
+        #[builder(setter(into, strip_option), default)]
+        pub(crate) message_input: Option<MessagingType>,
+        #[builder(setter(into, strip_option), default)]
+        pub(crate) message_output: Option<MessagingType>,
+        #[builder(setter(into, strip_option), default)]
+        pub(crate) logging_type: Option<LoggingType>,
+    }
+
+    impl CmdOptionsBuilder {
+        fn validate(&self) -> Result<(), String> {
+            if let (Some(message_output), Some(logging_type)) =
+                (self.message_output.as_ref(), self.logging_type.as_ref())
+            {
+                validate_stdout_config(message_output.as_ref(), logging_type.as_ref())
+                    .map_err(|err| err.to_string())?;
+            }
+            Ok(())
+        }
     }
 }

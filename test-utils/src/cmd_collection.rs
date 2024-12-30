@@ -1,57 +1,34 @@
 use std::path::PathBuf;
 
-use proc_heim::{Cmd, CmdBuilder, CmdOptions, CmdOptionsBuilder, MessagingType};
+use proc_heim::{Cmd, CmdOptions, MessagingType};
 
 pub fn hanging_forever_cmd() -> Cmd {
-    CmdBuilder::default()
-        .cmd("tail")
-        .args(vec!["-f".into(), "/dev/stdin".into()])
-        .build()
-        .unwrap()
+    Cmd::with_args("tail", ["-f", "/dev/stdin"])
 }
 
 pub fn echo_cmd_with_options(msg: &str, options: CmdOptions) -> Cmd {
-    CmdBuilder::default()
-        .cmd("echo")
-        .args(vec![msg.into()])
-        .options(options)
-        .build()
-        .unwrap()
+    Cmd::with_args_and_options("echo", [msg], options)
 }
 
 pub fn echo_to_stderr_cmd_with_options(msg: &str, options: CmdOptions) -> Cmd {
-    CmdBuilder::default()
-        .cmd("bash")
-        .args(vec![
-            "-c".into(),
-            format!(r#""echo -n '${msg}' >> /dev/stderr""#),
-        ])
-        .options(options)
-        .build()
-        .unwrap()
+    let cmd = format!("echo -n '${msg}' >> /dev/stderr");
+    Cmd::with_args_and_options("bash", ["-c".into(), cmd], options)
 }
 
 pub fn bash_script(script_path: PathBuf, options: CmdOptions, mut args: Vec<String>) -> Cmd {
     let mut merged_args = vec!["-C".into(), script_path.to_str().unwrap().into()];
     merged_args.append(&mut args);
-
-    CmdBuilder::default()
-        .cmd("bash")
-        .args(merged_args)
-        .options(options)
-        .build()
-        .unwrap()
+    Cmd::with_args_and_options("bash", merged_args, options)
 }
 
 pub mod std_io {
     use super::*;
 
     pub fn echo_cmd(msg: &str) -> Cmd {
-        let options = CmdOptionsBuilder::default()
-            .message_output(MessagingType::StandardIo)
-            .build()
-            .unwrap();
-        echo_cmd_with_options(msg, options)
+        echo_cmd_with_options(
+            msg,
+            CmdOptions::with_message_output(MessagingType::StandardIo),
+        )
     }
 
     pub fn echo_daemon_script_path() -> PathBuf {

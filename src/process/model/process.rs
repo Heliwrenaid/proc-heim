@@ -1,22 +1,35 @@
 use std::process::ExitStatus;
 
-use derive_builder::Builder;
 use tokio::process::Child;
 
 use crate::process::{
     log_reader::LogReaderHandle, reader::MessageReaderHandle, writer::MessageWriterHandle,
 };
 
-#[derive(Builder, Debug)]
-#[builder(pattern = "owned")]
-pub struct Process {
+#[derive(Debug)]
+pub(crate) struct Process {
     pub child: Child,
-    #[builder(default = "None")]
     pub message_writer: Option<MessageWriterHandle>,
-    #[builder(default = "None")]
     pub message_reader: Option<MessageReaderHandle>,
-    #[builder(default = "None")]
     pub log_reader: Option<LogReaderHandle>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct ProcessBuilder {
+    pub message_writer: Option<MessageWriterHandle>,
+    pub message_reader: Option<MessageReaderHandle>,
+    pub log_reader: Option<LogReaderHandle>,
+}
+
+impl ProcessBuilder {
+    pub fn build(self, child: Child) -> Process {
+        Process {
+            child,
+            message_writer: self.message_writer,
+            message_reader: self.message_reader,
+            log_reader: self.log_reader,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

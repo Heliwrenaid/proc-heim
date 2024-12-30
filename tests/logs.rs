@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use proc_heim::{Cmd, CmdOptionsBuilder, GetLogsError, LoggingType, LogsQuery};
+use proc_heim::{Cmd, CmdOptions, GetLogsError, LoggingType, LogsQuery};
 use test_utils::cmd_collection::{
     bash_script, echo_cmd_with_options,
     std_io::{echo_all_args_script_path, echo_stderr_script},
@@ -72,18 +72,12 @@ fn assert_logs(
 }
 
 fn echo_cmd_with_logging(msg: &str, logging_type: LoggingType) -> Cmd {
-    let options = CmdOptionsBuilder::default()
-        .logging_type(logging_type)
-        .build()
-        .unwrap();
+    let options = CmdOptions::with_logging(logging_type);
     echo_cmd_with_options(msg, options)
 }
 
 fn echo_to_stderr_cmd_with_logging(msg: &str, logging_type: LoggingType) -> Cmd {
-    let options = CmdOptionsBuilder::default()
-        .logging_type(logging_type)
-        .build()
-        .unwrap();
+    let options = CmdOptions::with_logging(logging_type);
     bash_script(echo_stderr_script(), options, vec![msg.into()])
 }
 
@@ -150,9 +144,6 @@ fn generate_logs() -> Vec<String> {
 }
 
 fn echo_all_args_script(args: &[String]) -> Cmd {
-    let options = CmdOptionsBuilder::default()
-        .logging_type(LoggingType::StdoutAndStderr)
-        .build()
-        .unwrap();
+    let options = CmdOptions::with_logging(LoggingType::StdoutAndStderr);
     bash_script(echo_all_args_script_path(), options, args.to_vec())
 }
