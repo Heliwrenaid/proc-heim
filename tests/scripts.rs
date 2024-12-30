@@ -2,8 +2,12 @@ use std::time::Duration;
 
 use futures::future::FutureExt as _;
 use proc_heim::{
-    CmdOptions, CustomScriptRunConfig, LogsQuery, MessagingType, ProcessManagerHandle, Script,
-    ScriptLanguage, SCRIPT_FILE_PATH_PLACEHOLDER,
+    manager::ProcessManagerHandle,
+    model::{
+        command::{CmdOptions, MessagingType},
+        process::LogsQuery,
+        script::{CustomScriptRunConfig, Script, ScriptLanguage, SCRIPT_FILE_PATH_PLACEHOLDER},
+    },
 };
 use tokio_stream::StreamExt;
 use uuid::Uuid;

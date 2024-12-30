@@ -1,4 +1,4 @@
-use proc_heim::{Cmd, CmdOptions};
+use proc_heim::model::command::{Cmd, CmdOptions};
 use proptest::collection::vec;
 use proptest::prelude::*;
 use test_utils::cmd_collection::{
@@ -59,7 +59,10 @@ proptest! {
             data4 in any::<f32>(),
             data5 in any::<bool>()
     ) {
-        use proc_heim::{DataFormat, Encoding};
+        use proc_heim::model::serde::{DataFormat};
+
+        #[cfg(feature = "message-pack")]
+        use proc_heim::model::serde::{Encoding};
 
         let cmd = echo_daemon_script();
         let message = ExampleMessage {

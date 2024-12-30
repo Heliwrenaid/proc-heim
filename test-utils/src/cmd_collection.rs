@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use proc_heim::{Cmd, CmdOptions, MessagingType};
+use proc_heim::model::command::{Cmd, CmdOptions, MessagingType};
 
 pub fn hanging_forever_cmd() -> Cmd {
     Cmd::with_args("tail", ["-f", "/dev/stdin"])

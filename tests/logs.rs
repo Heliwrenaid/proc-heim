@@ -1,6 +1,12 @@
 use std::time::Duration;
 
-use proc_heim::{Cmd, CmdOptions, GetLogsError, LoggingType, LogsQuery};
+use proc_heim::{
+    manager::GetLogsError,
+    model::{
+        command::{Cmd, CmdOptions, LoggingType},
+        process::LogsQuery,
+    },
+};
 use test_utils::cmd_collection::{
     bash_script, echo_cmd_with_options,
     std_io::{echo_all_args_script_path, echo_stderr_script},

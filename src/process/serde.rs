@@ -12,6 +12,7 @@ mod inner {
     use std::fmt::Display;
 
     #[derive(Debug, Clone)]
+    #[non_exhaustive]
     pub enum DataFormat {
         #[cfg(feature = "json")]
         Json,

@@ -1,10 +1,11 @@
 use std::time::Duration;
 
-use crate::{
-    GetLogsError, GetProcessDataError, KillProcessError, LogsQuery, ProcessData, ProcessId,
-    ProcessManagerHandle, ReadMessageError, ReceiveMessageBytesError, ReceiveMessageError,
-    WriteMessageError,
+use crate::manager::{
+    GetLogsError, GetProcessDataError, KillProcessError, ProcessManagerHandle, ReadMessageError,
+    ReceiveMessageBytesError, ReceiveMessageError, WriteMessageError,
 };
+
+use crate::model::process::{LogsQuery, ProcessData, ProcessId};
 
 use tokio::task::JoinHandle;
 use tokio_stream::Stream;

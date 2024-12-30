@@ -1,6 +1,9 @@
 use std::{env, time::Duration};
 
-use proc_heim::{Cmd, CmdOptions, LoggingType, LogsQuery, Runnable};
+use proc_heim::model::{
+    command::{Cmd, CmdOptions, LoggingType},
+    process::{LogsQuery, Runnable},
+};
 
 use crate::common::create_process_manager;
 

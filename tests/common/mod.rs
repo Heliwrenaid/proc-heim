@@ -1,4 +1,4 @@
-use proc_heim::{ProcessManager, ProcessManagerHandle};
+use proc_heim::manager::{ProcessManager, ProcessManagerHandle};
 use tempfile::{tempdir, TempDir};
 
 pub fn create_process_manager() -> (TempDir, ProcessManagerHandle) {

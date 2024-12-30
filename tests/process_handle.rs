@@ -2,7 +2,10 @@ use std::time::Duration;
 
 use crate::common::create_process_manager;
 use futures::FutureExt;
-use proc_heim::{GetProcessDataError, LogsQuery, ScriptLanguage};
+use proc_heim::{
+    manager::GetProcessDataError,
+    model::{process::LogsQuery, script::ScriptLanguage},
+};
 use test_utils::{cmd_collection::std_io::echo_cmd, scripts_collection::*};
 use tokio_stream::StreamExt;
 
@@ -12,7 +15,7 @@ mod test_cases;
 #[cfg(feature = "json")]
 use crate::test_cases::ExampleMessage;
 #[cfg(feature = "json")]
-use proc_heim::CmdOptions;
+use proc_heim::model::command::CmdOptions;
 
 #[tokio::test]
 async fn test_process_handle_wrapper() {
@@ -89,7 +92,8 @@ async fn should_kill_process() {
 #[cfg(feature = "json")]
 #[tokio::test]
 async fn should_write_and_read_json() {
-    use proc_heim::{DataFormat, Script};
+    use proc_heim::model::script::Script;
+    use proc_heim::model::serde::DataFormat;
 
     let (_dir, manager_handle) = create_process_manager();
     let script = Script::with_options(

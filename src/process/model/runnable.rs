@@ -1,6 +1,6 @@
 use std::{fmt::Debug, path::Path};
 
-use crate::Cmd;
+use super::Cmd;
 
 pub trait Runnable: Debug + Send + 'static {
     fn bootstrap_cmd(&self, process_dir: &Path) -> Result<Cmd, String>;

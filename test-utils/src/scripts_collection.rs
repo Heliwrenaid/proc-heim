@@ -1,4 +1,7 @@
-use proc_heim::{CmdOptions, LoggingType, Script, ScriptLanguage};
+use proc_heim::model::{
+    command::{CmdOptions, LoggingType},
+    script::{Script, ScriptLanguage},
+};
 
 pub fn build_echo_script(lang: ScriptLanguage, script: &str, args: &[String]) -> Script {
     let mut options = CmdOptions::named_pipe();

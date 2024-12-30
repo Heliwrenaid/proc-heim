@@ -1,11 +1,11 @@
-use proc_heim::Cmd;
+use proc_heim::model::command::Cmd;
 use serde::{Deserialize, Serialize};
 use tokio_stream::StreamExt as _;
 
 use crate::common::create_process_manager;
 
 #[cfg(any(feature = "json", feature = "message-pack"))]
-use proc_heim::DataFormat;
+use proc_heim::model::serde::DataFormat;
 
 #[allow(dead_code)]
 pub async fn should_read_message<F: Fn(&str) -> Cmd>(cmd_with_message: F) {

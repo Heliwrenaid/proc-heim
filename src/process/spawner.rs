@@ -12,14 +12,14 @@ use nix::{
 };
 use tokio::{net::unix, process::Command};
 
-use crate::{working_dir::WorkingDir, LoggingType, Runnable};
+use crate::working_dir::WorkingDir;
 
 use super::{
     log_reader::LogReader,
     model::{MessagingType, Process, ProcessBuilder},
     reader::{MessageReader, MessageReaderError},
     writer::MessageWriter,
-    Cmd, ProcessId,
+    Cmd, LoggingType, ProcessId, Runnable,
 };
 
 pub struct ProcessSpawner {
@@ -213,7 +213,7 @@ impl From<MessageReaderError> for SpawnerError {
 mod tests {
     use std::time::Duration;
 
-    use crate::{process::log_reader::LogSettingsQuery, CmdOptions};
+    use crate::process::{log_reader::LogSettingsQuery, CmdOptions};
 
     use super::*;
 

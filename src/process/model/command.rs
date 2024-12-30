@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::Runnable;
+use super::Runnable;
 
 #[cfg(not(feature = "builder"))]
 #[derive(Debug, Clone, PartialEq, Eq)]

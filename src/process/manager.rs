@@ -9,11 +9,12 @@ use tokio_stream::{
     Stream, StreamExt,
 };
 
-use crate::{working_dir::WorkingDir, ProcessData, ProcessHandle, Runnable};
+use crate::working_dir::WorkingDir;
 
 use super::{
     log_reader::{LogReaderError, LogsQuery, LogsQueryType},
     spawner::ProcessSpawner,
+    ProcessData, ProcessHandle, Runnable,
 };
 use super::{
     model::{Process, ProcessId},
