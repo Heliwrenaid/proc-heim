@@ -5,7 +5,7 @@ use std::path::Path;
 
 pub const SCRIPT_FILE_PATH_PLACEHOLDER: &str = "$FILE_PATH";
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ScriptLanguage {
     Bash,
     Python,
@@ -48,7 +48,7 @@ impl ScriptLanguage {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CustomScriptRunConfig {
     cmd: String,
     args: Vec<String>,
@@ -97,7 +97,7 @@ pub struct Script {
 }
 
 #[cfg(feature = "builder")]
-#[derive(Debug, Clone, Builder)]
+#[derive(Debug, Clone, Builder, PartialEq, Eq)]
 pub struct Script {
     #[builder(setter(into))]
     pub(crate) lang: ScriptLanguage,
@@ -186,7 +186,7 @@ impl Script {
         self.args.get_or_insert(Vec::new()).push(arg.into());
     }
 
-    pub fn get_mut_options(&mut self) -> &mut CmdOptions {
+    pub fn options_mut(&mut self) -> &mut CmdOptions {
         &mut self.options
     }
 }

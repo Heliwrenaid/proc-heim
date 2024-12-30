@@ -32,7 +32,7 @@ impl ProcessBuilder {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProcessData {
     pid: Option<u32>,
     exit_status: Option<ExitStatus>,

@@ -20,3 +20,15 @@ impl Display for ProcessId {
         f.write_str(&self.inner.to_string())
     }
 }
+
+impl From<Uuid> for ProcessId {
+    fn from(inner: Uuid) -> Self {
+        Self { inner }
+    }
+}
+
+impl AsRef<Uuid> for ProcessId {
+    fn as_ref(&self) -> &Uuid {
+        &self.inner
+    }
+}

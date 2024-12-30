@@ -6,7 +6,7 @@ use std::{
 use crate::Runnable;
 
 #[cfg(not(feature = "builder"))]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Cmd {
     pub(crate) cmd: String,
     pub(crate) args: Option<Vec<String>>,
@@ -81,13 +81,13 @@ impl Cmd {
         self.args.get_or_insert(Vec::new()).push(arg.into());
     }
 
-    pub fn get_mut_options(&mut self) -> &mut CmdOptions {
+    pub fn options_mut(&mut self) -> &mut CmdOptions {
         &mut self.options
     }
 }
 
 #[cfg(not(feature = "builder"))]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CmdOptions {
     pub(crate) current_dir: Option<PathBuf>,
     pub(crate) clear_envs: bool,
@@ -254,7 +254,7 @@ pub mod builder {
     use super::*;
     use derive_builder::Builder;
 
-    #[derive(Debug, Clone, Builder)]
+    #[derive(Debug, Clone, Builder, PartialEq, Eq)]
     pub struct Cmd {
         #[builder(setter(into))]
         pub(crate) cmd: String,
@@ -264,7 +264,7 @@ pub mod builder {
         pub(crate) options: CmdOptions,
     }
 
-    #[derive(Debug, Clone, Default, Builder)]
+    #[derive(Debug, Clone, Default, Builder, PartialEq, Eq)]
     #[builder(build_fn(validate = "Self::validate"))]
     pub struct CmdOptions {
         #[builder(setter(into, strip_option), default)]

@@ -24,7 +24,7 @@ async fn should_set_environment_variable() {
     let env_value = "some text";
 
     let mut cmd = get_env_cmd(env_name);
-    cmd.get_mut_options().add_env(env_name, env_value);
+    cmd.options_mut().add_env(env_name, env_value);
     let actual_env_value = spawn_and_read_message(cmd).await;
 
     assert_eq!(env_value, actual_env_value.unwrap());
@@ -50,7 +50,7 @@ async fn should_remove_environment_variable() {
     env::set_var(env_name, env_value);
 
     let mut cmd = get_env_cmd(env_name);
-    cmd.get_mut_options().remove_env(env_name);
+    cmd.options_mut().remove_env(env_name);
     let actual_env_value = spawn_and_read_message(cmd).await;
 
     assert!(actual_env_value.is_none());
@@ -62,7 +62,7 @@ async fn should_update_environment_variable() {
     let env_value_old = env!("PATH");
     let env_value_new = format!("{env_value_old}:/some/dir");
     let mut cmd = get_env_cmd(env_name);
-    cmd.get_mut_options().add_env(env_name, &env_value_new);
+    cmd.options_mut().add_env(env_name, &env_value_new);
     let actual_env_value = spawn_and_read_message(cmd).await;
 
     assert_eq!(env_value_new, actual_env_value.unwrap());
