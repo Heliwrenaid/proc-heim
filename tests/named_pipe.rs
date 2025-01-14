@@ -78,7 +78,7 @@ async fn should_write_json_message_and_read_part_of_it() {
 fn echo_daemon_script() -> Cmd {
     bash_script(
         named_pipe::echo_daemon_script_path(),
-        CmdOptions::named_pipe(),
+        CmdOptions::with_named_pipe_messaging(),
         vec![],
     )
 }
@@ -86,7 +86,7 @@ fn echo_daemon_script() -> Cmd {
 fn echo_json_script(json_path: &str) -> Cmd {
     bash_script(
         named_pipe::echo_json_script(),
-        CmdOptions::named_pipe(),
+        CmdOptions::with_named_pipe_messaging(),
         vec![json_path.into()],
     )
 }

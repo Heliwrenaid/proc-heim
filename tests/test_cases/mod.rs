@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use proc_heim::model::command::Cmd;
 use serde::{Deserialize, Serialize};
 use tokio_stream::StreamExt as _;
@@ -90,10 +92,7 @@ pub async fn should_read_structured_message(cmd: Cmd, message: ExampleMessage) {
         .await
         .unwrap();
 
-    let mut stream = handle
-        .subscribe_message_stream::<ExampleMessage>(process_id)
-        .await
-        .unwrap();
+    let mut stream = handle.subscribe_message_stream(process_id).await.unwrap();
     assert_eq!(message, stream.try_next().await.unwrap().unwrap());
 }
 

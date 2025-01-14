@@ -3,8 +3,8 @@ use std::time::Duration;
 use crate::common::create_process_manager;
 use futures::FutureExt;
 use proc_heim::{
-    manager::GetProcessDataError,
-    model::{process::LogsQuery, script::ScriptLanguage},
+    manager::{GetProcessInfoError, LogsQuery},
+    model::script::ScriptLanguage,
 };
 use test_utils::{cmd_collection::std_io::echo_cmd, scripts_collection::*};
 use tokio_stream::StreamExt;
@@ -77,15 +77,15 @@ async fn should_kill_process() {
     let handle = manager_handle.spawn_with_handle(script).await.unwrap();
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let process_data = handle.get_process_data().await.unwrap();
+    let process_data = handle.get_process_info().await.unwrap();
     assert!(process_data.is_running());
 
     assert!(handle.kill().await.is_ok());
 
-    let result = handle.get_process_data().await;
+    let result = handle.get_process_info().await;
     assert!(matches!(
         result,
-        Err(GetProcessDataError::ProcessNotFound(_))
+        Err(GetProcessInfoError::ProcessNotFound(_))
     ));
 }
 
@@ -102,7 +102,7 @@ async fn should_write_and_read_json() {
             read msg < /dev/stdin
             echo "$msg"
             "#,
-        CmdOptions::standard_io(),
+        CmdOptions::with_standard_io_messaging(),
     );
     let handle = manager_handle.spawn_with_handle(script).await.unwrap();
 

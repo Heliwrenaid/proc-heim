@@ -6,6 +6,7 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+# TODO: check which all libs (and its features) is needed
 [dependencies]
 derive_builder = { version = "0.20.2", optional = true }
 tokio = { version = "1.41.0", features = ["full"] }

@@ -10,6 +10,7 @@ use tokio::{
 };
 use tokio_stream::{wrappers::LinesStream, StreamExt as TokioStreamExt};
 
+/// Type describing how to fetch logs from spawned process.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LogsQuery {
     offset: usize,
@@ -17,10 +18,18 @@ pub struct LogsQuery {
 }
 
 impl LogsQuery {
+    /// Fetch all logs.
     pub fn fetch_all() -> Self {
         Self::default()
     }
 
+    /// Fetch logs with given limit. It will retrieve a maximum of `limit` logs starting from first one.
+    /// # Examples
+    /// ```
+    /// # use proc_heim::manager::LogsQuery;
+    /// // assume logs are: [log0, log1, log2, log3, log4]
+    /// LogsQuery::with_limit(2); // [log0, log1]
+    /// ```
     pub fn with_limit(limit: usize) -> Self {
         Self {
             offset: 0,
@@ -28,6 +37,13 @@ impl LogsQuery {
         }
     }
 
+    /// Fetch logs with given offset. It will retrieve logs starting from `offset` to the last produced log.
+    /// # Examples
+    /// ```
+    /// # use proc_heim::manager::LogsQuery;
+    /// // assume logs are: [log0, log1, log2, log3, log4]
+    /// LogsQuery::with_offset(2); // [log2, log3, log4]
+    /// ```
     pub fn with_offset(offset: usize) -> Self {
         Self {
             offset,
@@ -35,6 +51,13 @@ impl LogsQuery {
         }
     }
 
+    /// Fetch logs with given offset and limit.
+    /// # Examples
+    /// ```
+    /// # use proc_heim::manager::LogsQuery;
+    /// // assume logs are: [log0, log1, log2, log3, log4]
+    /// LogsQuery::with_offset_and_limit(2, 2); // [log2, log3]
+    /// ```
     pub fn with_offset_and_limit(offset: usize, limit: usize) -> Self {
         Self {
             offset,

@@ -11,19 +11,27 @@ mod inner {
 
     use std::fmt::Display;
 
+    /// Message data format type.
     #[derive(Debug, Clone)]
     #[non_exhaustive]
     pub enum DataFormat {
+        /// `JSON` format.
         #[cfg(feature = "json")]
         Json,
+        /// `MessagePack` binary format.
+        /// `MessagePack` serialization can produce `null bytes`, which will break a communication via pipes.
+        /// Therefore the messages should be additionally encoded.
         #[cfg(feature = "message-pack")]
         MessagePack(Encoding),
     }
 
+    /// Enum describing message encoding.
     #[cfg(feature = "message-pack")]
     #[derive(Debug, Clone)]
     pub enum Encoding {
+        /// `Base64` encoding.
         Base64,
+        /// `Hexadecimal` encoding.
         Hex,
     }
 

@@ -62,7 +62,7 @@ pub mod named_pipe {
     pub fn echo_script(msg: &str) -> Cmd {
         bash_script(
             echo_script_path(),
-            CmdOptions::named_pipe(),
+            CmdOptions::with_named_pipe_messaging(),
             vec![msg.into()],
         )
     }

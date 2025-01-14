@@ -2,10 +2,9 @@ use std::time::Duration;
 
 use futures::future::FutureExt as _;
 use proc_heim::{
-    manager::ProcessManagerHandle,
+    manager::{LogsQuery, ProcessManagerHandle},
     model::{
         command::{CmdOptions, MessagingType},
-        process::LogsQuery,
         script::{CustomScriptRunConfig, Script, ScriptLanguage, SCRIPT_FILE_PATH_PLACEHOLDER},
     },
 };
@@ -28,7 +27,7 @@ async fn should_run_custom_script() {
     let mut options = CmdOptions::with_message_output(MessagingType::StandardIo);
     options.set_current_dir(dir.path().into());
 
-    let script = Script::with_args_and_option(
+    let script = Script::with_args_and_options(
         ScriptLanguage::Other(run_config),
         r#"
         dir="$(pwd)/$1"

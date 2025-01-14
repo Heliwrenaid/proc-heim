@@ -4,11 +4,11 @@ use proc_heim::model::{
 };
 
 pub fn build_echo_script(lang: ScriptLanguage, script: &str, args: &[String]) -> Script {
-    let mut options = CmdOptions::named_pipe();
+    let mut options = CmdOptions::with_named_pipe_messaging();
     options
         .set_logging_type(LoggingType::StdoutAndStderr)
         .unwrap();
-    Script::with_args_and_option(lang, script, args, options)
+    Script::with_args_and_options(lang, script, args, options)
 }
 
 pub const BASH_ECHO_SCRIPT: &str = r#"

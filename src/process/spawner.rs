@@ -17,10 +17,20 @@ use crate::working_dir::WorkingDir;
 use super::{
     log_reader::LogReader,
     model::{MessagingType, Process, ProcessBuilder},
-    reader::{MessageReader, MessageReaderError},
+    reader::MessageReader,
     writer::MessageWriter,
     Cmd, LoggingType, ProcessId, Runnable,
 };
+
+// TODO: should add PROCESS_DIRECTORY env
+/// Environment variable representing a named pipe path used to read incoming messages in the child process.
+///
+/// See [`ProcessManagerHandle::write_messages_with_format`](crate::manager::ProcessManagerHandle::write_messages_with_format) example.
+pub const INPUT_PIPE_ENV_NAME: &str = "INPUT_PIPE";
+/// Environment variable representing a named pipe path used to write messages to the parent process.
+///
+/// See [`ProcessManagerHandle::write_messages_with_format`](crate::manager::ProcessManagerHandle::write_messages_with_format) example.
+pub const OUTPUT_PIPE_ENV_NAME: &str = "OUTPUT_PIPE";
 
 pub struct ProcessSpawner {
     working_dir: WorkingDir,
@@ -41,8 +51,8 @@ impl ProcessSpawner {
         match self.try_spawn_runnable(id, &*runnable, &process_dir) {
             Ok(process) => Ok(process),
             Err(err) => {
-                let _ = fs::remove_dir_all(&process_dir);
                 let _ = runnable.clean_after_fail(&process_dir);
+                let _ = fs::remove_dir_all(&process_dir);
                 Err(err)
             }
         }
@@ -101,14 +111,13 @@ impl ProcessSpawner {
                 MessagingType::NamedPipe => {
                     let output_pipe = self.working_dir.message_reader_pipe(id);
                     Self::create_named_pipe(&output_pipe)?;
-                    child.env("OUTPUT_PIPE", output_pipe.clone());
+                    child.env(OUTPUT_PIPE_ENV_NAME, output_pipe.clone());
                     unix::pipe::OpenOptions::new()
                         .read_write(true)
                         .open_receiver(output_pipe)?
                 }
             };
-            let message_reader =
-                MessageReader::spawn(receiver, cmd.options.output_buffer_capacity)?;
+            let message_reader = MessageReader::spawn(receiver, cmd.options.output_buffer_capacity);
             process_builder.message_reader = message_reader.into();
         }
 
@@ -122,7 +131,7 @@ impl ProcessSpawner {
                 MessagingType::NamedPipe => {
                     let input_pipe = self.working_dir.message_writer_pipe(id);
                     Self::create_named_pipe(&input_pipe)?;
-                    child.env("INPUT_PIPE", input_pipe.clone());
+                    child.env(INPUT_PIPE_ENV_NAME, input_pipe.clone());
                     unix::pipe::OpenOptions::new()
                         .read_write(true)
                         .open_sender(input_pipe)?
@@ -191,22 +200,10 @@ pub enum SpawnerError {
     CannotCreateNamedPipe(PathBuf, Errno),
     #[error("Cannot spawn process: {0}")]
     CannotSpawnProcess(#[from] io::Error),
-    #[error("Cannot spawn process: {0}")]
+    #[error("Cannot create process directory: {0}")]
     CannotCreateProcessWorkingDir(io::Error),
-    #[error("Invalid output buffer capacity: {0}")]
-    InvalidOutputBufferCapacity(usize),
     #[error("Bootstrap process failed: {0}")]
     BootstrapProcessFailed(String),
-}
-
-impl From<MessageReaderError> for SpawnerError {
-    fn from(err: MessageReaderError) -> Self {
-        match err {
-            MessageReaderError::InvalidChannelCapacity(value) => {
-                Self::InvalidOutputBufferCapacity(value)
-            }
-        }
-    }
 }
 
 #[cfg(test)]

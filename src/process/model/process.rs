@@ -32,25 +32,31 @@ impl ProcessBuilder {
     }
 }
 
+/// Type representing information about spawned process.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProcessData {
+pub struct ProcessInfo {
     pid: Option<u32>,
     exit_status: Option<ExitStatus>,
 }
 
-impl ProcessData {
+impl ProcessInfo {
     pub(crate) fn new(pid: Option<u32>, exit_status: Option<ExitStatus>) -> Self {
         Self { pid, exit_status }
     }
 
+    /// Retrieve information about OS-assigned process identifier. For more information see [`Child::id`](tokio::process::Child::id) docs.
     pub fn pid(&self) -> Option<u32> {
         self.pid
     }
 
+    /// Retrieve information about process exit status.
+    /// If the process has exited, then `Some(status)` is returned.
+    /// If the exit status is not available at this time then `None` is returned.
     pub fn exit_status(&self) -> Option<ExitStatus> {
         self.exit_status
     }
 
+    /// Check if process is still running. This is equivalent of `self.exit_status().is_none()`.
     pub fn is_running(&self) -> bool {
         self.exit_status.is_none()
     }

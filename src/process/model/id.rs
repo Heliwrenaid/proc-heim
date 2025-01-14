@@ -2,13 +2,14 @@ use std::fmt::Display;
 
 use uuid::Uuid;
 
+/// Type representing an ID of spawned process. Uses `UUID` internally.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ProcessId {
     inner: Uuid,
 }
 
 impl ProcessId {
-    pub fn random() -> Self {
+    pub(crate) fn random() -> Self {
         Self {
             inner: Uuid::new_v4(),
         }

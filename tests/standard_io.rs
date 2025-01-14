@@ -89,7 +89,7 @@ async fn should_write_json_message_and_read_part_of_it() {
 fn echo_daemon_script() -> Cmd {
     bash_script(
         std_io::echo_daemon_script_path(),
-        CmdOptions::standard_io(),
+        CmdOptions::with_standard_io_messaging(),
         vec![],
     )
 }
@@ -97,7 +97,7 @@ fn echo_daemon_script() -> Cmd {
 fn echo_json_script(json_path: &str) -> Cmd {
     bash_script(
         std_io::echo_json_script(),
-        CmdOptions::standard_io(),
+        CmdOptions::with_standard_io_messaging(),
         vec![json_path.into()],
     )
 }

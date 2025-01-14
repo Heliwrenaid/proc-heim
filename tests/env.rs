@@ -1,8 +1,11 @@
 use std::{env, time::Duration};
 
-use proc_heim::model::{
-    command::{Cmd, CmdOptions, LoggingType},
-    process::{LogsQuery, Runnable},
+use proc_heim::{
+    manager::LogsQuery,
+    model::{
+        command::{Cmd, CmdOptions, LoggingType},
+        Runnable,
+    },
 };
 
 use crate::common::create_process_manager;
@@ -37,7 +40,7 @@ async fn should_set_environment_variable() {
 async fn should_clear_all_env_vars() {
     let mut cmd = Cmd::new("env");
     let mut options = CmdOptions::with_logging(LoggingType::StdoutOnly);
-    options.set_clear_envs(true);
+    options.clear_inherited_envs(true);
     cmd.set_options(options);
 
     let actual_env_value = spawn_and_read_message(cmd).await;
