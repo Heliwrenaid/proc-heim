@@ -15,7 +15,7 @@ pub mod model {
         //!
         //! [`Cmd`] implements [`Runnable`](trait@crate::model::Runnable) trait, and therefore it can be spawned using [`ProcessManagerHandle`](struct@crate::manager::ProcessManagerHandle).
         pub use crate::process::{
-            BufferCapacity, Cmd, CmdOptions, CmdOptionsError, LoggingType, MessagingType,
+            BufferCapacity, Cmd, CmdError, CmdOptions, CmdOptionsError, LoggingType, MessagingType,
         };
 
         /// Alternative API for creating [`Cmd`] and [`CmdOptions`] structures.

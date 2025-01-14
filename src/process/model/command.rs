@@ -5,8 +5,16 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// Enum returned from fallible `Cmd` methods.
+#[derive(thiserror::Error, Debug)]
+pub enum CmdError {
+    /// No command name was provided
+    #[error("No command name was provided")]
+    NoCommandNameProvided,
+}
+
 use super::Runnable;
-// TODO: make BashShell wrapper (bash -c ...) ?
+
 /// `Cmd` represents a single command.
 ///
 /// It requires at least to set a command name.
@@ -22,7 +30,6 @@ pub struct Cmd {
     pub(crate) options: CmdOptions,
 }
 
-// TODO: add parse() and parse_with_options()
 impl Cmd {
     /// Creates a new command with given name.
     /// # Examples
@@ -94,6 +101,37 @@ impl Cmd {
             args: Some(args.into_iter().map(Into::into).collect()),
             options,
         }
+    }
+
+    /// Try to create a new command from given whitespace separated string.
+    /// Notice that it will trim all whitespace characters.
+    /// # Examples
+    /// ```
+    /// # use proc_heim::model::command::*;
+    /// let cmd = Cmd::parse("ls -l /some/path").unwrap();
+    /// assert_eq!(cmd, Cmd::with_args("ls", ["-l", "/some/path"]));
+    /// # assert_eq!(cmd, Cmd::parse("ls -l    /some/path").unwrap());
+    /// ```
+    pub fn parse(cmd_string: &str) -> Result<Self, CmdError> {
+        let mut parts = cmd_string.split_ascii_whitespace();
+        if let Some(cmd) = parts.next() {
+            Ok(Cmd::with_args(cmd, parts))
+        } else {
+            Err(CmdError::NoCommandNameProvided)
+        }
+    }
+
+    /// Try to create a new command from given whitespace separated string and options.
+    /// Notice that it will trim all whitespace characters.
+    /// # Examples
+    /// ```
+    /// # use proc_heim::model::command::*;
+    /// let cmd = Cmd::parse_with_options("ls -l /some/path", CmdOptions::default());
+    /// ```
+    pub fn parse_with_options(cmd_string: &str, options: CmdOptions) -> Result<Self, CmdError> {
+        let mut cmd = Self::parse(cmd_string)?;
+        cmd.options = options;
+        Ok(cmd)
     }
 
     /// Set a command arguments.
@@ -379,7 +417,7 @@ fn validate_stdout_config(
     Ok(())
 }
 
-/// Enum returned from fallible `CmdOptions` methods
+/// Enum returned from fallible `CmdOptions` methods.
 #[derive(thiserror::Error, Debug)]
 pub enum CmdOptionsError {
     /// Standard output can only be used for logging or messaging, but not both.
