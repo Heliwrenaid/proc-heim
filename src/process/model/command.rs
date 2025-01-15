@@ -8,7 +8,7 @@ use std::{
 /// Enum returned from fallible `Cmd` methods.
 #[derive(thiserror::Error, Debug)]
 pub enum CmdError {
-    /// No command name was provided
+    /// No command name was provided.
     #[error("No command name was provided")]
     NoCommandNameProvided,
 }

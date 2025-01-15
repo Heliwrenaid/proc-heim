@@ -4,7 +4,7 @@ use crate::common::create_process_manager;
 use futures::FutureExt;
 use proc_heim::{
     manager::{GetProcessInfoError, LogsQuery},
-    model::script::ScriptLanguage,
+    model::script::ScriptingLanguage,
 };
 use test_utils::{cmd_collection::std_io::echo_cmd, scripts_collection::*};
 use tokio_stream::StreamExt;
@@ -25,14 +25,14 @@ async fn test_process_handle_wrapper() {
     let args = vec![arg.to_owned()];
     let message_to_sent = "Test message";
 
-    let script = build_echo_script(ScriptLanguage::Bash, BASH_ECHO_SCRIPT, &args);
+    let script = build_echo_script(ScriptingLanguage::Bash, BASH_ECHO_SCRIPT, &args);
 
     let handle = manager_handle
         .spawn_with_handle(script.clone())
         .await
         .unwrap();
 
-    handle.write_message(message_to_sent).await.unwrap();
+    handle.send_message(message_to_sent).await.unwrap();
 
     let mut stream = handle.subscribe_message_string_stream().await.unwrap();
     let message = stream.try_next().await.unwrap().unwrap();
@@ -73,7 +73,11 @@ async fn test_process_handle_wrapper() {
 #[tokio::test]
 async fn should_kill_process() {
     let (_dir, manager_handle) = create_process_manager();
-    let script = build_echo_script(ScriptLanguage::Bash, BASH_ECHO_SCRIPT, &["arg".to_owned()]);
+    let script = build_echo_script(
+        ScriptingLanguage::Bash,
+        BASH_ECHO_SCRIPT,
+        &["arg".to_owned()],
+    );
     let handle = manager_handle.spawn_with_handle(script).await.unwrap();
     tokio::time::sleep(Duration::from_secs(1)).await;
 
@@ -97,7 +101,7 @@ async fn should_write_and_read_json() {
 
     let (_dir, manager_handle) = create_process_manager();
     let script = Script::with_options(
-        ScriptLanguage::Bash,
+        ScriptingLanguage::Bash,
         r#"
             read msg < /dev/stdin
             echo "$msg"
@@ -113,7 +117,7 @@ async fn should_write_and_read_json() {
     };
 
     handle
-        .write_messages_with_format(&message, DataFormat::Json)
+        .send_message_with_format(&message, DataFormat::Json)
         .await
         .unwrap();
 

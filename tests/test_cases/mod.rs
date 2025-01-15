@@ -27,8 +27,8 @@ pub async fn should_spawn_process_then_communicate_with_it_then_kill(cmd: Cmd) {
     let (_dir, handle) = create_process_manager();
     let process_id = handle.spawn(cmd).await.unwrap();
 
-    handle.write_message(process_id, b"msg1").await.unwrap();
-    handle.write_message(process_id, b"msg2").await.unwrap();
+    handle.send_message(process_id, b"msg1").await.unwrap();
+    handle.send_message(process_id, b"msg2").await.unwrap();
 
     let msg3 = b"\x95\xa0\x90\xca\xc2"; // extended ASCII codes
 
@@ -53,7 +53,7 @@ pub async fn should_spawn_process_then_communicate_with_it_then_kill(cmd: Cmd) {
         }
     });
 
-    handle.write_message(process_id, msg3).await.unwrap();
+    handle.send_message(process_id, msg3).await.unwrap();
     reader.await.unwrap();
 }
 
@@ -88,7 +88,7 @@ pub async fn should_read_structured_message(cmd: Cmd, message: ExampleMessage) {
     let process_id = handle.spawn(cmd).await.unwrap();
 
     handle
-        .write_message(process_id, message.clone())
+        .send_message(process_id, message.clone())
         .await
         .unwrap();
 
@@ -107,7 +107,7 @@ pub async fn should_read_message_with_format(
     let process_id = handle.spawn(cmd).await.unwrap();
 
     handle
-        .write_messages_with_format(process_id, message.clone(), format.clone())
+        .send_message_with_format(process_id, message.clone(), format.clone())
         .await
         .unwrap();
 
@@ -130,7 +130,7 @@ pub async fn should_write_json_message_and_read_part_of_it<F: Fn(&str) -> Cmd>(c
         ..Default::default()
     };
 
-    handle.write_message(process_id, message).await.unwrap();
+    handle.send_message(process_id, message).await.unwrap();
 
     let mut stream = handle
         .subscribe_message_bytes_stream(process_id)

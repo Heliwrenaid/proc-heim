@@ -56,7 +56,7 @@ enum ProcessManagerMessage {
 ///
 /// The implementation relies on the `Actor model` architecture which benefits from high concurrency and scalability and loose-coupling between actors (units doing some work).
 /// `ProcessManager` is a main actor responsible for:
-/// * spawning new actors (eg. for writing/reading messages to/from user-defined processes),
+/// * spawning new actors (eg. for sending/reading messages to/from user-defined processes),
 /// * forwarding messages between client and other actors.
 ///
 /// All files needed to handle spawned processes are kept in user-specified directory, called further `working directory`.
@@ -119,7 +119,7 @@ impl ProcessManager {
                 data,
                 responder,
             } => {
-                let result = self.write_message(id, data).await;
+                let result = self.send_message(id, data).await;
                 let _ = responder.send(result);
             }
             ProcessManagerMessage::GetLogs {
@@ -186,7 +186,7 @@ impl ProcessManager {
         Ok(receiver)
     }
 
-    async fn write_message(
+    async fn send_message(
         &mut self,
         id: ProcessId,
         data: Vec<u8>,
@@ -290,6 +290,79 @@ impl ProcessManagerHandle {
     ) -> Result<ProcessHandle, SpawnProcessError> {
         let id = self.spawn(runnable).await?;
         Ok(ProcessHandle::new(id, self.clone()))
+    }
+
+    /// Send a message to the process with given `id`.
+    ///
+    /// The message should be serializable to bytes via `TryInto<Vec<u8>` trait.
+    /// Notice that `\n` character signals the end of the message,
+    /// so message containing `\n` will be truncated to this character.
+    /// # Examples
+    /// ```
+    /// use futures::TryStreamExt;
+    /// use proc_heim::{
+    ///     manager::ProcessManager,
+    ///     model::{
+    ///         command::CmdOptions,
+    ///         script::{Script, ScriptingLanguage},
+    ///     },
+    /// };
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let working_dir = tempfile::tempdir()?.into_path();
+    /// let handle = ProcessManager::spawn(working_dir);
+    ///
+    /// let script = Script::with_options(
+    ///     ScriptingLanguage::Bash,
+    ///     r#"
+    ///     read -r msg < /dev/stdin
+    ///     echo "Hello $msg"
+    ///     "#,
+    ///     CmdOptions::with_standard_io_messaging(),
+    /// );
+    ///
+    /// let process_id = handle.spawn(script).await?;
+    /// handle.send_message(process_id, "John").await?;
+    /// let mut stream = handle.subscribe_message_string_stream(process_id).await?;
+    /// let received_msg = stream.try_next().await?.unwrap();
+    /// assert_eq!("Hello John", received_msg);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn send_message<T, E>(&self, id: ProcessId, data: T) -> Result<(), WriteMessageError>
+    where
+        T: TryInto<Vec<u8>, Error = E>,
+        E: Debug,
+    {
+        let bytes = data.try_into().map_err(|err| {
+            WriteMessageError::CannotSerializeMessage(format!(
+                "Cannot serialize message to bytes: {err:?}"
+            ))
+        })?;
+
+        if let Some(data) = Self::into_bytes_with_eol_char(bytes) {
+            let (responder, receiver) = oneshot::channel();
+            let msg = ProcessManagerMessage::WriteMessage {
+                id,
+                data,
+                responder,
+            };
+            let _ = self.sender.send(msg).await;
+            receiver.await??;
+        }
+        Ok(())
+    }
+
+    fn into_bytes_with_eol_char(mut bytes: Vec<u8>) -> Option<Vec<u8>> {
+        if let Some(last_char) = bytes.last() {
+            if *last_char != b'\n' {
+                bytes.push(b'\n');
+            }
+            Some(bytes)
+        } else {
+            None
+        }
     }
 
     //TODO: merge all subscribe_* methods into special type eg. MessagesSubscriber
@@ -402,107 +475,6 @@ impl ProcessManagerHandle {
         })
     }
 
-    // TODO: change name to send_message ?
-    /// Send a message to the process with given `id`.
-    ///
-    /// The message should be serializable to bytes via `TryInto<Vec<u8>` trait.
-    /// Notice that `\n` character signals the end of the message,
-    /// so message containing `\n` will be truncated to this character.
-    /// # Examples
-    /// ```
-    /// use futures::TryStreamExt;
-    /// use proc_heim::{
-    ///     manager::ProcessManager,
-    ///     model::{
-    ///         command::CmdOptions,
-    ///         script::{Script, ScriptLanguage},
-    ///     },
-    /// };
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let working_dir = tempfile::tempdir()?.into_path();
-    /// let handle = ProcessManager::spawn(working_dir);
-    ///
-    /// let script = Script::with_options(
-    ///     ScriptLanguage::Bash,
-    ///     r#"
-    ///     read -r msg < /dev/stdin
-    ///     echo "Hello $msg"
-    ///     "#,
-    ///     CmdOptions::with_standard_io_messaging(),
-    /// );
-    ///
-    /// let process_id = handle.spawn(script).await?;
-    /// handle.write_message(process_id, "John").await?;
-    /// let mut stream = handle.subscribe_message_string_stream(process_id).await?;
-    /// let received_msg = stream.try_next().await?.unwrap();
-    /// assert_eq!("Hello John", received_msg);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn write_message<T, E>(&self, id: ProcessId, data: T) -> Result<(), WriteMessageError>
-    where
-        T: TryInto<Vec<u8>, Error = E>,
-        E: Debug,
-    {
-        let bytes = data.try_into().map_err(|err| {
-            WriteMessageError::CannotSerializeMessage(format!(
-                "Cannot serialize message to bytes: {err:?}"
-            ))
-        })?;
-
-        if let Some(data) = Self::into_bytes_with_eol_char(bytes) {
-            let (responder, receiver) = oneshot::channel();
-            let msg = ProcessManagerMessage::WriteMessage {
-                id,
-                data,
-                responder,
-            };
-            let _ = self.sender.send(msg).await;
-            receiver.await??;
-        }
-        Ok(())
-    }
-
-    fn into_bytes_with_eol_char(mut bytes: Vec<u8>) -> Option<Vec<u8>> {
-        if let Some(last_char) = bytes.last() {
-            if *last_char != b'\n' {
-                bytes.push(b'\n');
-            }
-            Some(bytes)
-        } else {
-            None
-        }
-    }
-
-    /// Forcefully kills the process with given `id`.
-    ///
-    /// It will also abort all background tasks related to the process (eg. for messaging, logging) and remove process directory.
-    /// # Examples
-    /// ```
-    /// use proc_heim::{manager::ProcessManager, model::command::Cmd};
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let working_dir = tempfile::tempdir()?.into_path();
-    /// let handle = ProcessManager::spawn(working_dir);
-    /// let process_id = handle.spawn(Cmd::new("cat")).await?;
-    ///
-    /// let result = handle.kill(process_id).await;
-    ///
-    /// assert!(result.is_ok());
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn kill(&self, id: ProcessId) -> Result<(), KillProcessError> {
-        let (responder, receiver) = oneshot::channel();
-        let msg = ProcessManagerMessage::KillProcess { id, responder };
-        let _ = self.sender.send(msg).await;
-        receiver.await??;
-        Ok(())
-    }
-
     /// Fetch logs from standard `output` stream, produced by a process with given `id`.
     ///
     /// The method will return [`GetLogsError::LoggingTypeWasNotConfigured`] error, if [`LoggingType`](enum@crate::model::command::LoggingType) was set to `StderrOnly`.
@@ -513,7 +485,7 @@ impl ProcessManagerHandle {
     ///     manager::{LogsQuery, ProcessManager},
     ///     model::{
     ///         command::{CmdOptions, LoggingType},
-    ///         script::{Script, ScriptLanguage},
+    ///         script::{Script, ScriptingLanguage},
     ///     },
     /// };
     /// use std::time::Duration;
@@ -523,7 +495,7 @@ impl ProcessManagerHandle {
     /// let working_dir = tempfile::tempdir()?.into_path();
     /// let handle = ProcessManager::spawn(working_dir);
     /// let script = Script::with_options(
-    ///     ScriptLanguage::Bash,
+    ///     ScriptingLanguage::Bash,
     ///     r#"
     ///     echo message1
     ///     echo message2
@@ -564,7 +536,7 @@ impl ProcessManagerHandle {
     ///     manager::{LogsQuery, ProcessManager},
     ///     model::{
     ///         command::{CmdOptions, LoggingType},
-    ///         script::{Script, ScriptLanguage},
+    ///         script::{Script, ScriptingLanguage},
     ///     },
     /// };
     /// use std::time::Duration;
@@ -574,7 +546,7 @@ impl ProcessManagerHandle {
     /// let working_dir = tempfile::tempdir()?.into_path();
     /// let handle = ProcessManager::spawn(working_dir);
     /// let script = Script::with_options(
-    ///     ScriptLanguage::Bash,
+    ///     ScriptingLanguage::Bash,
     ///     r#"
     ///     echo message1 >&2
     ///     echo message2 >&2
@@ -690,6 +662,33 @@ impl ProcessManagerHandle {
             }
         })
     }
+
+    /// Forcefully kills the process with given `id`.
+    ///
+    /// It will also abort all background tasks related to the process (eg. for messaging, logging) and remove process directory.
+    /// # Examples
+    /// ```
+    /// use proc_heim::{manager::ProcessManager, model::command::Cmd};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let working_dir = tempfile::tempdir()?.into_path();
+    /// let handle = ProcessManager::spawn(working_dir);
+    /// let process_id = handle.spawn(Cmd::new("cat")).await?;
+    ///
+    /// let result = handle.kill(process_id).await;
+    ///
+    /// assert!(result.is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn kill(&self, id: ProcessId) -> Result<(), KillProcessError> {
+        let (responder, receiver) = oneshot::channel();
+        let msg = ProcessManagerMessage::KillProcess { id, responder };
+        let _ = self.sender.send(msg).await;
+        receiver.await??;
+        Ok(())
+    }
 }
 
 #[cfg(any(feature = "json", feature = "message-pack"))]
@@ -762,7 +761,6 @@ impl ProcessManagerHandle {
             .map_err(|err| ReceiveMessageError::CannotDeserializeMessage(err.to_string()))
     }
 
-    // TODO: send_message_with_format ?
     // NOTE: example referred from OUTPUT_PIPE_ENV_NAME, INPUT_PIPE_ENV_NAME docs
     /// Send a message (as `Rust` serializable type) to the process with given `id`.
     /// # Examples
@@ -773,7 +771,7 @@ impl ProcessManagerHandle {
     ///     manager::ProcessManager,
     ///     model::{
     ///         command::CmdOptions,
-    ///         script::{Script, ScriptLanguage},
+    ///         script::{Script, ScriptingLanguage},
     ///     },
     /// };
     /// use serde::Serialize;
@@ -789,7 +787,7 @@ impl ProcessManagerHandle {
     ///     let working_dir = tempfile::tempdir()?.into_path();
     ///     let handle = ProcessManager::spawn(working_dir);
     ///     let script = Script::with_options(
-    ///         ScriptLanguage::Bash,
+    ///         ScriptingLanguage::Bash,
     ///         r#"
     ///         read msg < $INPUT_PIPE
     ///         echo "$msg" | jq -r .field1 > $OUTPUT_PIPE
@@ -804,7 +802,7 @@ impl ProcessManagerHandle {
     ///         field2: 44,
     ///     };
     ///
-    ///     handle.write_messages_with_format(process_id, &msg, DataFormat::Json).await?;
+    ///     handle.send_message_with_format(process_id, &msg, DataFormat::Json).await?;
     ///
     ///     let mut stream = handle.subscribe_message_string_stream(process_id).await?;
     ///     let received_msg = stream.try_next().await?.unwrap();
@@ -812,7 +810,7 @@ impl ProcessManagerHandle {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn write_messages_with_format<T: serde::Serialize>(
+    pub async fn send_message_with_format<T: serde::Serialize>(
         &self,
         id: ProcessId,
         data: T,
@@ -820,7 +818,7 @@ impl ProcessManagerHandle {
     ) -> Result<(), WriteMessageError> {
         let bytes = SerdeUtil::serialize(&data, &format)
             .map_err(|err| WriteMessageError::CannotSerializeMessage(err.to_string()))?;
-        self.write_message(id, bytes).await
+        self.send_message(id, bytes).await
     }
 }
 
@@ -918,7 +916,7 @@ pub enum ReadMessageError {
     MessageReaderKilled,
 }
 
-/// Error type returned when writing a message to the process.
+/// Error type returned when sending a message to the process.
 #[derive(thiserror::Error, Debug)]
 pub enum WriteMessageError {
     /// The process with given ID was not found (the ID is wrong or the process has been already killed).
@@ -930,10 +928,10 @@ pub enum WriteMessageError {
     /// Cannot communicate with spawned process manager. Probably process manager task has been aborted.
     #[error("Cannot communicate with spawned process manager")]
     ManagerCommunicationError(#[from] oneshot::error::RecvError),
-    /// An unexpected IO error occurred when writing a message to the process.
-    #[error("Error occurred when writing message to process: {0}")]
+    /// An unexpected IO error occurred when sending a message to the process.
+    #[error("Error occurred when sending message to process: {0}")]
     IoError(#[from] std::io::Error),
-    /// The task used to write messages to a process has been killed.
+    /// The task used to send messages to a process has been killed.
     /// This error "shouldn't" normally occur because the task is aborted when a process is being killed. And after this `ProcessNotFound` will be returned.
     #[error("Message writer for process with id: {0} was not found")]
     MessageWriterNotFound(ProcessId),

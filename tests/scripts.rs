@@ -5,7 +5,7 @@ use proc_heim::{
     manager::{LogsQuery, ProcessManagerHandle},
     model::{
         command::{CmdOptions, MessagingType},
-        script::{CustomScriptRunConfig, Script, ScriptLanguage, SCRIPT_FILE_PATH_PLACEHOLDER},
+        script::{Script, ScriptRunConfig, ScriptingLanguage, SCRIPT_FILE_PATH_PLACEHOLDER},
     },
 };
 use tokio_stream::StreamExt;
@@ -20,15 +20,14 @@ mod common;
 async fn should_run_custom_script() {
     let (dir, handle) = create_process_manager();
 
-    let run_config =
-        CustomScriptRunConfig::new("bash", vec!["-C", SCRIPT_FILE_PATH_PLACEHOLDER], "sh");
+    let run_config = ScriptRunConfig::new("bash", vec!["-C", SCRIPT_FILE_PATH_PLACEHOLDER], "sh");
     let arg = Uuid::new_v4().to_string();
 
     let mut options = CmdOptions::with_message_output(MessagingType::StandardIo);
     options.set_current_dir(dir.path().into());
 
     let script = Script::with_args_and_options(
-        ScriptLanguage::Other(run_config),
+        ScriptingLanguage::Other(run_config),
         r#"
         dir="$(pwd)/$1"
         mkdir $dir
@@ -62,14 +61,14 @@ async fn test_scripts_in_different_languages() {
     let message = "Test message";
 
     let scripts = [
-        build_echo_script(ScriptLanguage::Bash, BASH_ECHO_SCRIPT, &args),
-        build_echo_script(ScriptLanguage::Python, PYTHON_ECHO_SCRIPT, &args),
-        build_echo_script(ScriptLanguage::Perl, PERL_ECHO_SCRIPT, &args),
-        build_echo_script(ScriptLanguage::Php, PHP_ECHO_SCRIPT, &args),
-        build_echo_script(ScriptLanguage::Ruby, RUBY_ECHO_SCRIPT, &args),
-        build_echo_script(ScriptLanguage::Lua, LUA_ECHO_SCRIPT, &args),
-        build_echo_script(ScriptLanguage::JavaScript, JAVASCRIPT_ECHO_SCRIPT, &args),
-        build_echo_script(ScriptLanguage::Groovy, GROOVY_ECHO_SCRIPT, &args),
+        build_echo_script(ScriptingLanguage::Bash, BASH_ECHO_SCRIPT, &args),
+        build_echo_script(ScriptingLanguage::Python, PYTHON_ECHO_SCRIPT, &args),
+        build_echo_script(ScriptingLanguage::Perl, PERL_ECHO_SCRIPT, &args),
+        build_echo_script(ScriptingLanguage::Php, PHP_ECHO_SCRIPT, &args),
+        build_echo_script(ScriptingLanguage::Ruby, RUBY_ECHO_SCRIPT, &args),
+        build_echo_script(ScriptingLanguage::Lua, LUA_ECHO_SCRIPT, &args),
+        build_echo_script(ScriptingLanguage::JavaScript, JAVASCRIPT_ECHO_SCRIPT, &args),
+        build_echo_script(ScriptingLanguage::Groovy, GROOVY_ECHO_SCRIPT, &args),
     ];
 
     for script in scripts {
@@ -85,7 +84,7 @@ async fn test_script(
 ) {
     let id = handle.spawn(script.clone()).await.unwrap();
 
-    handle.write_message(id, message_to_sent).await.unwrap();
+    handle.send_message(id, message_to_sent).await.unwrap();
 
     let mut stream = handle.subscribe_message_bytes_stream(id).await.unwrap();
     let message = stream.try_next().await.unwrap().unwrap();

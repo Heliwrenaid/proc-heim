@@ -25,11 +25,11 @@ use super::{
 // TODO: should add PROCESS_DIRECTORY env
 /// Environment variable representing a named pipe path used to read incoming messages in the child process.
 ///
-/// See [`ProcessManagerHandle::write_messages_with_format`](crate::manager::ProcessManagerHandle::write_messages_with_format) example.
+/// See [`ProcessManagerHandle::send_message_with_format`](crate::manager::ProcessManagerHandle::send_message_with_format) example.
 pub const INPUT_PIPE_ENV_NAME: &str = "INPUT_PIPE";
-/// Environment variable representing a named pipe path used to write messages to the parent process.
+/// Environment variable representing a named pipe path used to send messages to the parent process.
 ///
-/// See [`ProcessManagerHandle::write_messages_with_format`](crate::manager::ProcessManagerHandle::write_messages_with_format) example.
+/// See [`ProcessManagerHandle::send_message_with_format`](crate::manager::ProcessManagerHandle::send_message_with_format) example.
 pub const OUTPUT_PIPE_ENV_NAME: &str = "OUTPUT_PIPE";
 
 pub struct ProcessSpawner {
@@ -312,6 +312,4 @@ mod tests {
             CmdOptions::with_logging(logging_type),
         )
     }
-
-    // TODO: test setting other props and error handling
 }

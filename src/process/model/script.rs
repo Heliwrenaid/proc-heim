@@ -3,17 +3,16 @@ use super::{Cmd, CmdOptions, Runnable};
 use derive_builder::Builder;
 use std::path::Path;
 
-/// Constant used as a placeholder for a script file path. See [`CustomScriptRunConfig`] docs.
+/// Constant used as a placeholder for a script file path. See [`ScriptRunConfig`] docs.
 pub const SCRIPT_FILE_PATH_PLACEHOLDER: &str = "@FILE_PATH";
 
 /// Enum type representing a scripting language.
 ///
-/// `ScriptLanguage` provides run configuration for 8 most popular scripting languages.
-/// If you want to use other language, see [`ScriptLanguage::Other`].
+/// `ScriptingLanguage` provides run configuration for 8 most popular scripting languages.
+/// If you want to use other language, see [`ScriptingLanguage::Other`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum ScriptLanguage {
-    // TODO: rename to ScriptingLanguage
+pub enum ScriptingLanguage {
     /// Executes script with `bash` command.
     Bash,
     /// Executes script with `python` command.
@@ -30,65 +29,65 @@ pub enum ScriptLanguage {
     Ruby,
     /// Executes script with `groovy` command.
     Groovy,
-    /// Executes script with provided configuration. See [`CustomScriptRunConfig`] docs.
-    Other(CustomScriptRunConfig),
+    /// Executes script with provided configuration. See [`ScriptRunConfig`] docs.
+    Other(ScriptRunConfig),
 }
 
-impl ScriptLanguage {
-    fn get_cmd_and_args(&self, file_path: String) -> (&str, Vec<String>) {
-        // TODO: refactor and return run config...
-        match &self {
-            ScriptLanguage::Bash => ("bash", vec![file_path]),
-            ScriptLanguage::Python => ("python", vec![file_path]),
-            ScriptLanguage::Php => ("php", vec!["-f".into(), file_path]),
-            ScriptLanguage::JavaScript => ("node", vec![file_path]),
-            ScriptLanguage::Perl => ("perl", vec![file_path]),
-            ScriptLanguage::Lua => ("lua", vec![file_path]),
-            ScriptLanguage::Ruby => ("ruby", vec![file_path]),
-            ScriptLanguage::Groovy => ("groovy", vec![file_path]),
-            ScriptLanguage::Other(run_config) => run_config.get_cmd_and_args(&file_path),
-        }
-    }
-
-    fn get_file_extension(&self) -> &str {
-        match &self {
-            ScriptLanguage::Bash => "sh",
-            ScriptLanguage::Python => "py",
-            ScriptLanguage::Php => "php",
-            ScriptLanguage::JavaScript => "js",
-            ScriptLanguage::Perl => "pl",
-            ScriptLanguage::Lua => "lua",
-            ScriptLanguage::Ruby => "rb",
-            ScriptLanguage::Groovy => "groovy",
-            ScriptLanguage::Other(run_config) => &run_config.file_extension,
+impl From<ScriptingLanguage> for ScriptRunConfig {
+    fn from(value: ScriptingLanguage) -> Self {
+        match value {
+            ScriptingLanguage::Bash => {
+                ScriptRunConfig::new("bash", vec![SCRIPT_FILE_PATH_PLACEHOLDER], "sh")
+            }
+            ScriptingLanguage::Python => {
+                ScriptRunConfig::new("python", vec![SCRIPT_FILE_PATH_PLACEHOLDER], "py")
+            }
+            ScriptingLanguage::Php => {
+                ScriptRunConfig::new("php", vec!["-f", SCRIPT_FILE_PATH_PLACEHOLDER], "php")
+            }
+            ScriptingLanguage::JavaScript => {
+                ScriptRunConfig::new("node", vec![SCRIPT_FILE_PATH_PLACEHOLDER], "js")
+            }
+            ScriptingLanguage::Perl => {
+                ScriptRunConfig::new("perl", vec![SCRIPT_FILE_PATH_PLACEHOLDER], "pl")
+            }
+            ScriptingLanguage::Lua => {
+                ScriptRunConfig::new("lua", vec![SCRIPT_FILE_PATH_PLACEHOLDER], "lua")
+            }
+            ScriptingLanguage::Ruby => {
+                ScriptRunConfig::new("ruby", vec![SCRIPT_FILE_PATH_PLACEHOLDER], "rb")
+            }
+            ScriptingLanguage::Groovy => {
+                ScriptRunConfig::new("groovy", vec![SCRIPT_FILE_PATH_PLACEHOLDER], "groovy")
+            }
+            ScriptingLanguage::Other(run_config) => run_config,
         }
     }
 }
 
-/// `CustomScriptRunConfig` allows to define own configuration used to run a script.
+/// `ScriptRunConfig` allows to define own configuration used to run a script.
 ///
 /// It describes command name, its arguments needed to run a script and also
 /// a file extension typical for a given scripting language.
 /// # Examples
-/// Run configuration for PHP language (equivalent to [`ScriptLanguage::Php`]):
+/// Run configuration for PHP language (equivalent to [`ScriptingLanguage::Php`]):
 /// ```
-/// use proc_heim::model::script::CustomScriptRunConfig;
+/// use proc_heim::model::script::ScriptRunConfig;
 /// use proc_heim::model::script::SCRIPT_FILE_PATH_PLACEHOLDER;
 ///
-/// CustomScriptRunConfig::new("php", ["-f", SCRIPT_FILE_PATH_PLACEHOLDER], "php");
+/// ScriptRunConfig::new("php", ["-f", SCRIPT_FILE_PATH_PLACEHOLDER], "php");
 ///
 /// ```
 /// [`SCRIPT_FILE_PATH_PLACEHOLDER`] constant is used to mark that in this argument should be a path to a script file.
 /// Before spawning a script, the placeholder will be replaced by proper file path to the script (with extension provided in `file_extension` argument).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CustomScriptRunConfig {
-    //TODO: rename to ScriptRunConfig
+pub struct ScriptRunConfig {
     cmd: String,
     args: Vec<String>,
     file_extension: String,
 }
 
-impl CustomScriptRunConfig {
+impl ScriptRunConfig {
     /// Creates a new run configuration.
     pub fn new<C, T, I, F>(cmd: C, args: I, file_extension: F) -> Self
     where
@@ -104,8 +103,8 @@ impl CustomScriptRunConfig {
         }
     }
 
-    pub(crate) fn get_cmd_and_args(&self, file_path: &str) -> (&str, Vec<String>) {
-        let args = self
+    pub(crate) fn replace_path_placeholder(&mut self, file_path: &str) {
+        self.args = self
             .args
             .iter()
             .map(|arg| {
@@ -117,21 +116,20 @@ impl CustomScriptRunConfig {
                 .to_owned()
             })
             .collect();
-        (&self.cmd, args)
     }
 }
 
 /// `Script` represents a single script.
 ///
 /// It requires at least to set a scripting language and content. Script's arguments and options are optional.
-/// [`ScriptLanguage`] defines the language in which the script is implemented.
-/// Currently, library supports 8 most popular scripting languages, but it is possible to support a custom ones via [`ScriptLanguage::Other`].
+/// [`ScriptingLanguage`] defines the language in which the script is implemented.
+/// Currently, library supports 8 most popular scripting languages, but it is possible to support a custom ones via [`ScriptingLanguage::Other`].
 ///
 /// `Script` stores its content in a file and then executes [`Cmd`](struct@crate::model::command::Cmd) provided by [`Runnable`](trait@crate::model::Runnable) trait implementation.
 #[cfg(not(feature = "builder"))]
 #[derive(Debug, Clone)]
 pub struct Script {
-    pub(crate) lang: ScriptLanguage,
+    pub(crate) lang: ScriptingLanguage,
     pub(crate) content: String,
     pub(crate) args: Option<Vec<String>>,
     pub(crate) options: CmdOptions,
@@ -140,15 +138,15 @@ pub struct Script {
 /// `Script` represents a single script.
 ///
 /// It requires at least to set a scripting language and content. Script's arguments and options are optional.
-/// [`ScriptLanguage`] defines the language in which the script is implemented.
-/// Currently, library supports 8 most popular scripting languages, but it is possible to support a custom ones via [`ScriptLanguage::Other`].
+/// [`ScriptingLanguage`] defines the language in which the script is implemented.
+/// Currently, library supports 8 most popular scripting languages, but it is possible to support a custom ones via [`ScriptingLanguage::Other`].
 ///
 /// `Script` stores its content in a file and then executes [`Cmd`](struct@crate::model::command::Cmd) provided by [`Runnable`](trait@crate::model::Runnable) trait implementation.
 #[cfg(feature = "builder")]
 #[derive(Debug, Clone, Builder, PartialEq, Eq)]
 pub struct Script {
     #[builder(setter(into))]
-    pub(crate) lang: ScriptLanguage,
+    pub(crate) lang: ScriptingLanguage,
     #[builder(setter(into))]
     pub(crate) content: String,
     #[builder(setter(into, strip_option), default)]
@@ -162,12 +160,12 @@ impl Script {
     /// # Examples
     /// ```
     /// # use proc_heim::model::script::*;
-    /// Script::new(ScriptLanguage::Bash, r#"
+    /// Script::new(ScriptingLanguage::Bash, r#"
     ///     user=$(echo $USER)
     ///     echo "Hello $user"
     /// "#);
     /// ```
-    pub fn new<S>(lang: ScriptLanguage, content: S) -> Self
+    pub fn new<S>(lang: ScriptingLanguage, content: S) -> Self
     where
         S: Into<String>,
     {
@@ -183,9 +181,9 @@ impl Script {
     /// # Examples
     /// ```
     /// # use proc_heim::model::script::*;
-    /// Script::with_args(ScriptLanguage::Bash, "echo $@ | cut -d ' ' -f2", ["arg1", "arg2"]);
+    /// Script::with_args(ScriptingLanguage::Bash, "echo $@ | cut -d ' ' -f2", ["arg1", "arg2"]);
     /// ```
-    pub fn with_args<S, T, I>(lang: ScriptLanguage, content: S, args: I) -> Self
+    pub fn with_args<S, T, I>(lang: ScriptingLanguage, content: S, args: I) -> Self
     where
         S: Into<String>,
         T: Into<String>,
@@ -210,9 +208,9 @@ impl Script {
     ///     done
     ///"#;
     /// let options = CmdOptions::with_logging(LoggingType::StdoutOnly);
-    /// Script::with_options(ScriptLanguage::Bash, content, options);
+    /// Script::with_options(ScriptingLanguage::Bash, content, options);
     /// ```
-    pub fn with_options<S>(lang: ScriptLanguage, content: S, options: CmdOptions) -> Self
+    pub fn with_options<S>(lang: ScriptingLanguage, content: S, options: CmdOptions) -> Self
     where
         S: Into<String>,
     {
@@ -237,10 +235,10 @@ impl Script {
     /// "#;
     /// let args = vec!["/some/path"];
     /// let options = CmdOptions::with_logging(LoggingType::StdoutOnly);
-    /// Script::with_args_and_options(ScriptLanguage::Bash, content, args, options);
+    /// Script::with_args_and_options(ScriptingLanguage::Bash, content, args, options);
     /// ```
     pub fn with_args_and_options<S, T, I>(
-        lang: ScriptLanguage,
+        lang: ScriptingLanguage,
         content: S,
         args: I,
         options: CmdOptions,
@@ -262,7 +260,7 @@ impl Script {
     /// # Examples
     /// ```
     /// # use proc_heim::model::script::*;
-    /// let mut script = Script::new(ScriptLanguage::Bash, "echo $@ | cut -d ' ' -f2");
+    /// let mut script = Script::new(ScriptingLanguage::Bash, "echo $@ | cut -d ' ' -f2");
     /// script.set_args(["arg1", "arg2"]);
     /// ```
     pub fn set_args<S, I>(&mut self, args: I)
@@ -278,7 +276,7 @@ impl Script {
     /// ```
     /// # use proc_heim::model::script::*;
     /// # use proc_heim::model::command::*;
-    /// let mut script = Script::new(ScriptLanguage::Bash, "echo $@ | cut -d ' ' -f2");
+    /// let mut script = Script::new(ScriptingLanguage::Bash, "echo $@ | cut -d ' ' -f2");
     /// script.set_options(CmdOptions::with_standard_io_messaging());
     /// ```
     pub fn set_options(&mut self, options: CmdOptions) {
@@ -291,7 +289,7 @@ impl Script {
     /// ```
     /// # use proc_heim::model::script::*;
     /// # use proc_heim::model::command::*;
-    /// let mut script = Script::new(ScriptLanguage::Bash, "echo $@ | cut -d ' ' -f2");
+    /// let mut script = Script::new(ScriptingLanguage::Bash, "echo $@ | cut -d ' ' -f2");
     /// script.add_arg("arg1");
     /// script.add_arg("arg2");
     /// ```
@@ -307,7 +305,7 @@ impl Script {
     /// ```
     /// # use proc_heim::model::command::*;
     /// # use proc_heim::model::script::*;
-    /// let mut script = Script::new(ScriptLanguage::Bash, "echo $TEST_ENV_VAR | cut -d ' ' -f2");
+    /// let mut script = Script::new(ScriptingLanguage::Bash, "echo $TEST_ENV_VAR | cut -d ' ' -f2");
     /// script.options_mut().add_env("TEST_ENV_VAR", "example value");
     /// ```
     pub fn options_mut(&mut self) -> &mut CmdOptions {
@@ -317,25 +315,31 @@ impl Script {
 
 impl Runnable for Script {
     fn bootstrap_cmd(&self, process_dir: &Path) -> Result<Cmd, String> {
-        let file_path = create_script_file(self, process_dir)?;
-        let (cmd, mut args) = self.lang.get_cmd_and_args(file_path);
+        let mut run_config: ScriptRunConfig = self.lang.clone().into();
+        let file_path = create_script_file(self, &run_config, process_dir)?;
+        run_config.replace_path_placeholder(&file_path);
 
         if let Some(arguments) = &self.args {
-            args.extend_from_slice(arguments);
+            run_config.args.extend_from_slice(arguments);
         }
 
         let cmd = Cmd {
-            cmd: cmd.into(),
-            args: args.into(),
+            cmd: run_config.cmd,
+            args: run_config.args.into(),
             options: self.options.clone(),
         };
         Ok(cmd)
     }
 }
 
-fn create_script_file(script: &Script, script_file_dir: &Path) -> Result<String, String> {
-    let extension = script.lang.get_file_extension();
-    let file_path = script_file_dir.join("script").with_extension(extension);
+fn create_script_file(
+    script: &Script,
+    run_config: &ScriptRunConfig,
+    script_file_dir: &Path,
+) -> Result<String, String> {
+    let file_path = script_file_dir
+        .join("script")
+        .with_extension(&run_config.file_extension);
     std::fs::write(&file_path, &script.content).map_err(|err| err.to_string())?;
     file_path
         .to_str()

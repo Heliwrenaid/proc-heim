@@ -52,15 +52,15 @@ use proc_heim::{
     manager::{LogsQuery, ProcessManager},
     model::{
         command::{CmdOptions, LoggingType},
-        script::{Script, ScriptLanguage}, // TODO: ScriptLanguage -> ScriptingLanguage
+        script::{Script, ScriptingLanguage}
     },
 };
 use std::{path::PathBuf, time::Duration};
 
 let working_directory = PathBuf::from("/tmp/proc_heim");
-    let handle: proc_heim::manager::ProcessManagerHandle = ProcessManager::spawn(working_directory);
+    let handle = ProcessManager::spawn(working_directory);
     let script = Script::with_args_and_options(
-        ScriptLanguage::Bash,
+        ScriptingLanguage::Bash,
         r#"
         echo 'Simple log example'
         echo "Hello $1"
@@ -95,15 +95,15 @@ use proc_heim::{
     manager::ProcessManager,
     model::{
         command::CmdOptions,
-        script::{Script, ScriptLanguage},
+        script::{Script, ScriptingLanguage},
     },
 };
 use std::path::PathBuf;
 
 let working_directory = PathBuf::from("/tmp/proc_heim");
-let handle: proc_heim::manager::ProcessManagerHandle = ProcessManager::spawn(working_directory);
+let handle = ProcessManager::spawn(working_directory);
 let script = Script::with_options(
-    ScriptLanguage::Bash,
+    ScriptingLanguage::Bash,
     r#"
     counter=0
     while read msg; do
@@ -119,12 +119,12 @@ let script = Script::with_options(
 // but without having to pass the process ID to each method call.
 let process_handle = handle.spawn_with_handle(script).await?;
 
-process_handle.write_message("First message").await?; // TODO: send message
+process_handle.send_message("First message").await?;
 // We can send a next message without causing a deadlock here.
 // This is possible because the response to the first message
 // will be read by a dedicated Tokio task, 
 // spawned automatically by the Process Manager.
-process_handle.write_message("Second message").await?;
+process_handle.send_message("Second message").await?;
 
 let mut stream = process_handle.subscribe_message_string_stream().await?;
 

@@ -1,9 +1,9 @@
 use proc_heim::model::{
     command::{CmdOptions, LoggingType},
-    script::{Script, ScriptLanguage},
+    script::{Script, ScriptingLanguage},
 };
 
-pub fn build_echo_script(lang: ScriptLanguage, script: &str, args: &[String]) -> Script {
+pub fn build_echo_script(lang: ScriptingLanguage, script: &str, args: &[String]) -> Script {
     let mut options = CmdOptions::with_named_pipe_messaging();
     options
         .set_logging_type(LoggingType::StdoutAndStderr)

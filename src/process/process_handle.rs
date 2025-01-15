@@ -23,7 +23,6 @@ pub struct ProcessHandle {
     handle: ProcessManagerHandle,
 }
 
-//TODO: reorder methods (and in ProcessManagerHandle)
 impl ProcessHandle {
     /// Creates a new `ProcessHandle` from given process identifier and manager handle.
     pub fn new(id: ProcessId, handle: ProcessManagerHandle) -> Self {
@@ -33,6 +32,15 @@ impl ProcessHandle {
     /// Returns a process identifier associated with a handle.
     pub fn id(&self) -> &ProcessId {
         &self.id
+    }
+
+    /// See [`ProcessManagerHandle::send_message`] docs.
+    pub async fn send_message<T, E>(&self, data: T) -> Result<(), WriteMessageError>
+    where
+        T: TryInto<Vec<u8>, Error = E>,
+        E: Debug,
+    {
+        self.handle.send_message::<T, E>(self.id, data).await
     }
 
     /// See [`ProcessManagerHandle::subscribe_message_bytes_stream`] docs.
@@ -61,21 +69,6 @@ impl ProcessHandle {
         self.handle.subscribe_message_stream::<T, E>(self.id).await
     }
 
-    /// See [`ProcessManagerHandle::write_message`] docs.
-
-    pub async fn write_message<T, E>(&self, data: T) -> Result<(), WriteMessageError>
-    where
-        T: TryInto<Vec<u8>, Error = E>,
-        E: Debug,
-    {
-        self.handle.write_message::<T, E>(self.id, data).await
-    }
-
-    /// See [`ProcessManagerHandle::kill`] docs.
-    pub async fn kill(&self) -> Result<(), KillProcessError> {
-        self.handle.kill(self.id).await
-    }
-
     /// See [`ProcessManagerHandle::get_logs_stdout`] docs.
     pub async fn get_logs_stdout(&self, query: LogsQuery) -> Result<Vec<String>, GetLogsError> {
         self.handle.get_logs_stdout(self.id, query).await
@@ -98,6 +91,11 @@ impl ProcessHandle {
     ) -> JoinHandle<Result<ProcessInfo, GetProcessInfoError>> {
         self.handle.wait(self.id, poll_interval)
     }
+
+    /// See [`ProcessManagerHandle::kill`] docs.
+    pub async fn kill(&self) -> Result<(), KillProcessError> {
+        self.handle.kill(self.id).await
+    }
 }
 
 #[cfg(any(feature = "json", feature = "message-pack"))]
@@ -115,14 +113,14 @@ impl ProcessHandle {
             .await
     }
 
-    /// See [`ProcessManagerHandle::write_messages_with_format`] docs.
-    pub async fn write_messages_with_format<T: serde::Serialize>(
+    /// See [`ProcessManagerHandle::send_message_with_format`] docs.
+    pub async fn send_message_with_format<T: serde::Serialize>(
         &self,
         data: T,
         format: DataFormat,
     ) -> Result<(), WriteMessageError> {
         self.handle
-            .write_messages_with_format(self.id, data, format)
+            .send_message_with_format(self.id, data, format)
             .await
     }
 }
