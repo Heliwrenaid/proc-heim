@@ -22,7 +22,10 @@ use super::{
     Cmd, LoggingType, ProcessId, Runnable,
 };
 
-// TODO: should add PROCESS_DIRECTORY env
+/// Environment variable representing the directory intended for storing temporary process data.
+///
+/// The directory will be deleted when the process is killed manually.
+pub const PROCESS_DATA_DIR_ENV_NAME: &str = "PROCESS_DATA_DIR";
 /// Environment variable representing a named pipe path used to read incoming messages in the child process.
 ///
 /// See [`ProcessManagerHandle::send_message_with_format`](crate::manager::ProcessManagerHandle::send_message_with_format) example.
@@ -48,6 +51,7 @@ impl ProcessSpawner {
     ) -> Result<Process, SpawnerError> {
         let process_dir = self.working_dir.process_dir(id);
         fs::create_dir(&process_dir).map_err(SpawnerError::CannotCreateProcessWorkingDir)?;
+        fs::create_dir(self.working_dir.process_data_dir(id))?;
         match self.try_spawn_runnable(id, &*runnable, &process_dir) {
             Ok(process) => Ok(process),
             Err(err) => {
@@ -96,6 +100,11 @@ impl ProcessSpawner {
         }
 
         let mut process_builder = ProcessBuilder::default();
+
+        child.env(
+            PROCESS_DATA_DIR_ENV_NAME,
+            self.working_dir.process_data_dir(id),
+        );
 
         child.stdin(Stdio::null());
         child.stdout(Stdio::null());
@@ -225,6 +234,7 @@ mod tests {
         let id = ProcessId::random();
         let result = spawner.spawn_runnable(&id, Box::new(cat_cmd()));
         assert!(working_dir.process_dir(&id).exists());
+        assert!(working_dir.process_data_dir(&id).exists());
         assert!(result.is_ok());
     }
 

@@ -16,6 +16,10 @@ impl WorkingDir {
         self.dir.join(id.to_string())
     }
 
+    pub(crate) fn process_data_dir(&self, id: &ProcessId) -> PathBuf {
+        self.process_dir(id).join("data")
+    }
+
     pub(crate) fn message_writer_pipe(&self, id: &ProcessId) -> PathBuf {
         self.process_dir(id).join("writer_pipe")
     }
