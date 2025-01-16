@@ -30,7 +30,7 @@ use proc_heim::manager::ProcessManager;
 use std::path::PathBuf;
 
 let working_directory = PathBuf::from("/some/temp/path");
-let handle = ProcessManager::spawn(working_directory);
+let handle = ProcessManager::spawn(working_directory)?;
 // now use the handle to spawn new processes and interact with them
 ```
 
@@ -40,7 +40,7 @@ use proc_heim::manager::ProcessManager;
 use std::path::PathBuf;
 
 let working_directory = PathBuf::from("/tmp/proc_heim");
-let handle = ProcessManager::spawn(working_directory);
+let handle = ProcessManager::spawn(working_directory)?;
 let cmd = Cmd::with_args("ls", ["-l", "/some/dir"]);
 let process_id = handle.spawn(cmd).await?;
 // now use the process_id to interact with a process ...
@@ -58,7 +58,7 @@ use proc_heim::{
 use std::{path::PathBuf, time::Duration};
 
 let working_directory = PathBuf::from("/tmp/proc_heim");
-    let handle = ProcessManager::spawn(working_directory);
+    let handle = ProcessManager::spawn(working_directory)?;
     let script = Script::with_args_and_options(
         ScriptingLanguage::Bash,
         r#"
@@ -101,7 +101,7 @@ use proc_heim::{
 use std::path::PathBuf;
 
 let working_directory = PathBuf::from("/tmp/proc_heim");
-let handle = ProcessManager::spawn(working_directory);
+let handle = ProcessManager::spawn(working_directory)?;
 let script = Script::with_options(
     ScriptingLanguage::Bash,
     r#"

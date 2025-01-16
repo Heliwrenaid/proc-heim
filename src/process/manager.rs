@@ -1,4 +1,10 @@
-use std::{collections::HashMap, fmt::Debug, io, path::PathBuf, time::Duration};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    fs, io,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use tokio::{
     sync::{broadcast, mpsc, oneshot},
@@ -8,6 +14,7 @@ use tokio_stream::{
     wrappers::{errors::BroadcastStreamRecvError, BroadcastStream},
     Stream, StreamExt,
 };
+use uuid::Uuid;
 
 use crate::working_dir::WorkingDir;
 
@@ -72,26 +79,33 @@ pub struct ProcessManager {
     receiver: mpsc::Receiver<ProcessManagerMessage>,
 }
 
-// TODO: should add task which remove process dirs when process exited. The the process directory can be used for a process as own temp directory.
 impl ProcessManager {
     /// Spawns a new process manager task with a given `working_directory`, returning a handle associated with the manager's task.
+    ///
+    /// The `Err` value is returned, if provided `working_directory` is not a directory or is not writeable.
     /// # Examples
     /// ```no_run
     /// # use proc_heim::manager::ProcessManager;
     /// # use std::path::PathBuf;
     /// let working_directory = PathBuf::from("/some/temp/path");
-    /// let handle = ProcessManager::spawn(working_directory);
+    /// let handle = ProcessManager::spawn(working_directory).expect("Invalid working directory");
     /// ```
-    pub fn spawn(working_directory: PathBuf) -> ProcessManagerHandle {
-        // TODO: should return result, checking if path exists, is_dir and is writable...
-        let (sender, receiver) = mpsc::channel(8);
+    pub fn spawn(working_directory: PathBuf) -> Result<ProcessManagerHandle, io::Error> {
+        Self::validate_working_dir(&working_directory)?;
+        let (sender, receiver) = mpsc::channel(32);
         let mut manager = Self {
             process_spawner: ProcessSpawner::new(WorkingDir::new(working_directory)),
             receiver,
             processes: HashMap::new(),
         };
         tokio::spawn(async move { manager.run().await });
-        ProcessManagerHandle::new(sender)
+        Ok(ProcessManagerHandle::new(sender))
+    }
+
+    fn validate_working_dir(working_directory: &Path) -> Result<(), io::Error> {
+        let file_path = working_directory.join(Uuid::new_v4().to_string());
+        fs::write(&file_path, "testing working dir")?;
+        fs::remove_file(file_path)
     }
 
     async fn run(&mut self) {
@@ -267,7 +281,7 @@ impl ProcessManagerHandle {
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let working_dir = tempfile::tempdir()?.into_path();
-    /// let handle = ProcessManager::spawn(working_dir);
+    /// let handle = ProcessManager::spawn(working_dir)?;
     /// let cmd = Cmd::new("echo");
     /// let process_id = handle.spawn(cmd).await?;
     /// # Ok(())
@@ -311,7 +325,7 @@ impl ProcessManagerHandle {
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let working_dir = tempfile::tempdir()?.into_path();
-    /// let handle = ProcessManager::spawn(working_dir);
+    /// let handle = ProcessManager::spawn(working_dir)?;
     ///
     /// let script = Script::with_options(
     ///     ScriptingLanguage::Bash,
@@ -395,7 +409,7 @@ impl ProcessManagerHandle {
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// // spawn ProcessManager
     /// let working_dir = tempfile::tempdir()?.into_path();
-    /// let handle = ProcessManager::spawn(working_dir);
+    /// let handle = ProcessManager::spawn(working_dir)?;
     ///
     /// // create simple echo command
     /// let msg = "Hello world!";
@@ -493,7 +507,7 @@ impl ProcessManagerHandle {
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let working_dir = tempfile::tempdir()?.into_path();
-    /// let handle = ProcessManager::spawn(working_dir);
+    /// let handle = ProcessManager::spawn(working_dir)?;
     /// let script = Script::with_options(
     ///     ScriptingLanguage::Bash,
     ///     r#"
@@ -544,7 +558,7 @@ impl ProcessManagerHandle {
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let working_dir = tempfile::tempdir()?.into_path();
-    /// let handle = ProcessManager::spawn(working_dir);
+    /// let handle = ProcessManager::spawn(working_dir)?;
     /// let script = Script::with_options(
     ///     ScriptingLanguage::Bash,
     ///     r#"
@@ -604,7 +618,7 @@ impl ProcessManagerHandle {
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let working_dir = tempfile::tempdir()?.into_path();
-    /// let handle = ProcessManager::spawn(working_dir);
+    /// let handle = ProcessManager::spawn(working_dir)?;
     /// let process_id = handle.spawn(Cmd::new("cat")).await?;
     ///
     /// let process_info = handle.get_process_info(process_id).await?;
@@ -635,7 +649,7 @@ impl ProcessManagerHandle {
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let working_dir = tempfile::tempdir()?.into_path();
-    /// let handle = ProcessManager::spawn(working_dir);
+    /// let handle = ProcessManager::spawn(working_dir)?;
     /// let process_id = handle.spawn(Cmd::new("env")).await?;
     ///
     /// let process_info = handle.wait(process_id, Duration::from_micros(10)).await??;
@@ -673,7 +687,7 @@ impl ProcessManagerHandle {
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let working_dir = tempfile::tempdir()?.into_path();
-    /// let handle = ProcessManager::spawn(working_dir);
+    /// let handle = ProcessManager::spawn(working_dir)?;
     /// let process_id = handle.spawn(Cmd::new("cat")).await?;
     ///
     /// let result = handle.kill(process_id).await;
@@ -719,7 +733,7 @@ impl ProcessManagerHandle {
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///
     /// let working_dir = tempfile::tempdir()?.into_path();
-    /// let handle = ProcessManager::spawn(working_dir);
+    /// let handle = ProcessManager::spawn(working_dir)?;
     /// let json_msg = r#"{ "field1": "Hello", "field2": 123 }"#;
     /// let cmd = Cmd::with_args_and_options(
     ///     "echo",
@@ -785,7 +799,7 @@ impl ProcessManagerHandle {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let working_dir = tempfile::tempdir()?.into_path();
-    ///     let handle = ProcessManager::spawn(working_dir);
+    ///     let handle = ProcessManager::spawn(working_dir)?;
     ///     let script = Script::with_options(
     ///         ScriptingLanguage::Bash,
     ///         r#"
