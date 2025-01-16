@@ -59,10 +59,10 @@ proptest! {
             data4 in any::<f32>(),
             data5 in any::<bool>()
     ) {
-        use proc_heim::model::serde::{DataFormat};
+        use proc_heim::manager::serde::{MessageFormat};
 
         #[cfg(feature = "message-pack")]
-        use proc_heim::model::serde::{Encoding};
+        use proc_heim::manager::serde::{Encoding};
 
         let cmd = echo_daemon_script();
         let message = ExampleMessage {
@@ -74,9 +74,9 @@ proptest! {
         };
         tokio::runtime::Runtime::new().unwrap()
             .block_on(async {
-                test_cases::should_read_message_with_format(cmd.clone(), message.clone(), DataFormat::Json).await;
-                test_cases::should_read_message_with_format(cmd.clone(), message.clone(), DataFormat::MessagePack(Encoding::Hex)).await;
-                test_cases::should_read_message_with_format(cmd.clone(), message, DataFormat::MessagePack(Encoding::Base64)).await;
+                test_cases::should_read_message_with_format(cmd.clone(), message.clone(), MessageFormat::Json).await;
+                test_cases::should_read_message_with_format(cmd.clone(), message.clone(), MessageFormat::MessagePack(Encoding::Hex)).await;
+                test_cases::should_read_message_with_format(cmd.clone(), message, MessageFormat::MessagePack(Encoding::Base64)).await;
             });
     }
 }

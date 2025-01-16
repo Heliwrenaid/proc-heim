@@ -14,7 +14,7 @@ pub use process_handle::ProcessHandle;
 pub use spawner::{INPUT_PIPE_ENV_NAME, OUTPUT_PIPE_ENV_NAME};
 
 #[cfg(any(feature = "json", feature = "message-pack"))]
-pub use serde::DataFormat;
+pub use serde::MessageFormat;
 
 #[cfg(feature = "message-pack")]
 pub use serde::Encoding;

@@ -96,8 +96,8 @@ async fn should_kill_process() {
 #[cfg(feature = "json")]
 #[tokio::test]
 async fn should_write_and_read_json() {
+    use proc_heim::manager::serde::MessageFormat;
     use proc_heim::model::script::Script;
-    use proc_heim::model::serde::DataFormat;
 
     let (_dir, manager_handle) = create_process_manager();
     let script = Script::with_options(
@@ -117,12 +117,12 @@ async fn should_write_and_read_json() {
     };
 
     handle
-        .send_message_with_format(&message, DataFormat::Json)
+        .send_message_with_format(&message, MessageFormat::Json)
         .await
         .unwrap();
 
     let mut stream = handle
-        .subscribe_message_stream_with_format(DataFormat::Json)
+        .subscribe_message_stream_with_format(MessageFormat::Json)
         .await
         .unwrap();
     let next_message: ExampleMessage = stream.try_next().await.unwrap().unwrap();

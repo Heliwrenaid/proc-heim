@@ -190,16 +190,6 @@ pub mod model {
         }
     }
 
-    // TODO: move to manager
-    #[cfg(any(feature = "json", feature = "message-pack"))]
-    pub mod serde {
-        //! Types representing messages format and encoding.
-        pub use crate::process::DataFormat;
-
-        #[cfg(feature = "message-pack")]
-        pub use crate::process::Encoding;
-    }
-
     pub use crate::process::Runnable;
 }
 
@@ -217,5 +207,14 @@ pub mod manager {
         ReceiveMessageBytesError, ReceiveMessageError, SpawnProcessError, WriteMessageError,
         INPUT_PIPE_ENV_NAME, OUTPUT_PIPE_ENV_NAME,
     };
+
+    #[cfg(any(feature = "json", feature = "message-pack"))]
+    pub mod serde {
+        //! Types representing messages format and encoding.
+        pub use crate::process::MessageFormat;
+
+        #[cfg(feature = "message-pack")]
+        pub use crate::process::Encoding;
+    }
 }
 // TODO: add info about features. (and in docs in proper places eg. for serde module)

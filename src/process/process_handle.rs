@@ -99,14 +99,14 @@ impl ProcessHandle {
 }
 
 #[cfg(any(feature = "json", feature = "message-pack"))]
-use super::serde::DataFormat;
+use super::serde::MessageFormat;
 
 #[cfg(any(feature = "json", feature = "message-pack"))]
 impl ProcessHandle {
     /// See [`ProcessManagerHandle::subscribe_message_stream_with_format`] docs.
     pub async fn subscribe_message_stream_with_format<T: serde::de::DeserializeOwned>(
         &self,
-        format: DataFormat,
+        format: MessageFormat,
     ) -> Result<impl Stream<Item = Result<T, ReceiveMessageError>>, ReadMessageError> {
         self.handle
             .subscribe_message_stream_with_format::<T>(self.id, format)
@@ -117,7 +117,7 @@ impl ProcessHandle {
     pub async fn send_message_with_format<T: serde::Serialize>(
         &self,
         data: T,
-        format: DataFormat,
+        format: MessageFormat,
     ) -> Result<(), WriteMessageError> {
         self.handle
             .send_message_with_format(self.id, data, format)

@@ -1,5 +1,5 @@
 #[cfg(any(feature = "json", feature = "message-pack"))]
-pub use inner::{DataFormat, SerdeUtil};
+pub use inner::{MessageFormat, SerdeUtil};
 
 #[cfg(feature = "message-pack")]
 pub use inner::Encoding;
@@ -14,7 +14,7 @@ mod inner {
     /// Message data format type.
     #[derive(Debug, Clone)]
     #[non_exhaustive]
-    pub enum DataFormat {
+    pub enum MessageFormat {
         /// `JSON` format.
         #[cfg(feature = "json")]
         Json,
@@ -35,13 +35,13 @@ mod inner {
         Hex,
     }
 
-    impl Display for DataFormat {
+    impl Display for MessageFormat {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
                 #[cfg(feature = "json")]
-                DataFormat::Json => f.write_str("Json"),
+                MessageFormat::Json => f.write_str("Json"),
                 #[cfg(feature = "message-pack")]
-                DataFormat::MessagePack(_encoding) => f.write_str("MessagePack"),
+                MessageFormat::MessagePack(_encoding) => f.write_str("MessagePack"),
             }
         }
     }
@@ -60,9 +60,9 @@ mod inner {
     #[derive(thiserror::Error, Debug)]
     pub enum SerdeError {
         #[error("Cannot serialize data with format: {0}. Cause: {1}")]
-        SerializationError(DataFormat, String),
+        SerializationError(MessageFormat, String),
         #[error("Cannot deserialize data with format: {0}. Cause: {1}")]
-        DeserializationError(DataFormat, String),
+        DeserializationError(MessageFormat, String),
         #[error("Cannot decode data with {0}. Cause: {1}")]
         #[cfg(feature = "message-pack")]
         DecodingError(Encoding, String),
@@ -73,14 +73,14 @@ mod inner {
     impl SerdeUtil {
         pub fn serialize<T: serde::Serialize>(
             data: &T,
-            format: &DataFormat,
+            format: &MessageFormat,
         ) -> Result<Vec<u8>, SerdeError> {
             let bytes = match format {
                 #[cfg(feature = "json")]
-                DataFormat::Json => serde_json::to_vec(&data)
+                MessageFormat::Json => serde_json::to_vec(&data)
                     .map_err(|err| SerdeError::SerializationError(format.clone(), err.to_string())),
                 #[cfg(feature = "message-pack")]
-                DataFormat::MessagePack(ref encoding) => {
+                MessageFormat::MessagePack(ref encoding) => {
                     let bytes = rmp_serde::to_vec(&data).map_err(|err| {
                         SerdeError::SerializationError(format.clone(), err.to_string())
                     })?;
@@ -96,15 +96,15 @@ mod inner {
 
         pub fn deserialize<T: serde::de::DeserializeOwned>(
             bytes: &[u8],
-            format: &DataFormat,
+            format: &MessageFormat,
         ) -> Result<T, SerdeError> {
             match format {
                 #[cfg(feature = "json")]
-                DataFormat::Json => serde_json::from_slice(bytes).map_err(|err| {
+                MessageFormat::Json => serde_json::from_slice(bytes).map_err(|err| {
                     SerdeError::DeserializationError(format.clone(), err.to_string())
                 }),
                 #[cfg(feature = "message-pack")]
-                DataFormat::MessagePack(ref encoding) => {
+                MessageFormat::MessagePack(ref encoding) => {
                     let decoded_bytes = match encoding {
                         Encoding::Base64 => {
                             BASE64_STANDARD.decode(bytes).map_err(|err| err.to_string())

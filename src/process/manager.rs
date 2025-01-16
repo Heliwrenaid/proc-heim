@@ -692,7 +692,7 @@ impl ProcessManagerHandle {
 }
 
 #[cfg(any(feature = "json", feature = "message-pack"))]
-use super::serde::{DataFormat, SerdeUtil};
+use super::serde::{MessageFormat, SerdeUtil};
 
 #[cfg(any(feature = "json", feature = "message-pack"))]
 impl ProcessManagerHandle {
@@ -702,7 +702,7 @@ impl ProcessManagerHandle {
     /// # Examples
     /// ```
     /// use futures::TryStreamExt;
-    /// use proc_heim::model::serde::DataFormat;
+    /// use proc_heim::manager::serde::MessageFormat;
     /// use proc_heim::{
     ///     manager::ProcessManager,
     ///     model::command::{Cmd, CmdOptions, MessagingType},
@@ -735,7 +735,7 @@ impl ProcessManagerHandle {
     /// };
     ///
     /// let mut stream = handle
-    ///     .subscribe_message_stream_with_format(process_id, DataFormat::Json)
+    ///     .subscribe_message_stream_with_format(process_id, MessageFormat::Json)
     ///     .await?;
     /// let received_msg = stream.try_next().await?.unwrap();
     /// assert_eq!(expected_msg, received_msg);
@@ -745,7 +745,7 @@ impl ProcessManagerHandle {
     pub async fn subscribe_message_stream_with_format<T: serde::de::DeserializeOwned>(
         &self,
         id: ProcessId,
-        format: DataFormat,
+        format: MessageFormat,
     ) -> Result<impl Stream<Item = Result<T, ReceiveMessageError>>, ReadMessageError> {
         Ok(self
             .subscribe_message_bytes_stream(id)
@@ -755,7 +755,7 @@ impl ProcessManagerHandle {
 
     fn deserialize_message<T: serde::de::DeserializeOwned>(
         bytes: Result<Vec<u8>, ReceiveMessageBytesError>,
-        format: &DataFormat,
+        format: &MessageFormat,
     ) -> Result<T, ReceiveMessageError> {
         SerdeUtil::deserialize(&bytes?, format)
             .map_err(|err| ReceiveMessageError::CannotDeserializeMessage(err.to_string()))
@@ -766,7 +766,7 @@ impl ProcessManagerHandle {
     /// # Examples
     /// ```
     /// use futures::TryStreamExt;
-    /// use proc_heim::model::serde::DataFormat;
+    /// use proc_heim::manager::serde::MessageFormat;
     /// use proc_heim::{
     ///     manager::ProcessManager,
     ///     model::{
@@ -802,7 +802,7 @@ impl ProcessManagerHandle {
     ///         field2: 44,
     ///     };
     ///
-    ///     handle.send_message_with_format(process_id, &msg, DataFormat::Json).await?;
+    ///     handle.send_message_with_format(process_id, &msg, MessageFormat::Json).await?;
     ///
     ///     let mut stream = handle.subscribe_message_string_stream(process_id).await?;
     ///     let received_msg = stream.try_next().await?.unwrap();
@@ -814,7 +814,7 @@ impl ProcessManagerHandle {
         &self,
         id: ProcessId,
         data: T,
-        format: DataFormat,
+        format: MessageFormat,
     ) -> Result<(), WriteMessageError> {
         let bytes = SerdeUtil::serialize(&data, &format)
             .map_err(|err| WriteMessageError::CannotSerializeMessage(err.to_string()))?;

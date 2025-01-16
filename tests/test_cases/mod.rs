@@ -7,7 +7,7 @@ use tokio_stream::StreamExt as _;
 use crate::common::create_process_manager;
 
 #[cfg(any(feature = "json", feature = "message-pack"))]
-use proc_heim::model::serde::DataFormat;
+use proc_heim::manager::serde::MessageFormat;
 
 #[allow(dead_code)]
 pub async fn should_read_message<F: Fn(&str) -> Cmd>(cmd_with_message: F) {
@@ -101,7 +101,7 @@ pub async fn should_read_structured_message(cmd: Cmd, message: ExampleMessage) {
 pub async fn should_read_message_with_format(
     cmd: Cmd,
     message: ExampleMessage,
-    format: DataFormat,
+    format: MessageFormat,
 ) {
     let (_dir, handle) = create_process_manager();
     let process_id = handle.spawn(cmd).await.unwrap();
