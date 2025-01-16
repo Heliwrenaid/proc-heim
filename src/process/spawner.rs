@@ -220,10 +220,11 @@ mod tests {
     #[tokio::test]
     async fn should_spawn_process() {
         let working_dir = WorkingDir::new(temp_dir());
-        let spawner = ProcessSpawner::new(working_dir);
+        let spawner = ProcessSpawner::new(working_dir.clone());
 
         let id = ProcessId::random();
-        let result = spawner.spawn(&id, cat_cmd());
+        let result = spawner.spawn_runnable(&id, Box::new(cat_cmd()));
+        assert!(working_dir.process_dir(&id).exists());
         assert!(result.is_ok());
     }
 

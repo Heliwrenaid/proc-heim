@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fmt::Debug,
-    fs, io,
+    io,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -74,6 +74,7 @@ enum ProcessManagerMessage {
 /// Each spawned process has its own [`ProcessId`], which can be used to interact with it through [`ProcessManagerHandle`].
 /// For convenience of interacting with one process, use a [`ProcessHandle`] wrapper.
 pub struct ProcessManager {
+    working_dir: WorkingDir,
     process_spawner: ProcessSpawner,
     processes: HashMap<ProcessId, Process>,
     receiver: mpsc::Receiver<ProcessManagerMessage>,
@@ -93,8 +94,10 @@ impl ProcessManager {
     pub fn spawn(working_directory: PathBuf) -> Result<ProcessManagerHandle, io::Error> {
         Self::validate_working_dir(&working_directory)?;
         let (sender, receiver) = mpsc::channel(32);
+        let working_dir = WorkingDir::new(working_directory);
         let mut manager = Self {
-            process_spawner: ProcessSpawner::new(WorkingDir::new(working_directory)),
+            working_dir: working_dir.clone(),
+            process_spawner: ProcessSpawner::new(working_dir),
             receiver,
             processes: HashMap::new(),
         };
@@ -104,8 +107,8 @@ impl ProcessManager {
 
     fn validate_working_dir(working_directory: &Path) -> Result<(), io::Error> {
         let file_path = working_directory.join(Uuid::new_v4().to_string());
-        fs::write(&file_path, "testing working dir")?;
-        fs::remove_file(file_path)
+        std::fs::write(&file_path, "testing working dir")?;
+        std::fs::remove_file(file_path)
     }
 
     async fn run(&mut self) {
@@ -162,7 +165,6 @@ impl ProcessManager {
         Ok(id)
     }
 
-    // TODO: should remove process_dir
     async fn kill_process(&mut self, id: ProcessId) -> Result<(), KillProcessError> {
         let process = self
             .processes
@@ -178,6 +180,8 @@ impl ProcessManager {
             log_reader.abort().await;
         }
         self.processes.remove(&id); // kill_on_drop() is used to kill child process
+        let process_dir = self.working_dir.process_dir(&id);
+        let _ = tokio::fs::remove_dir_all(process_dir).await;
         Ok(())
     }
 
@@ -679,7 +683,7 @@ impl ProcessManagerHandle {
 
     /// Forcefully kills the process with given `id`.
     ///
-    /// It will also abort all background tasks related to the process (eg. for messaging, logging) and remove process directory.
+    /// It will also abort all background tasks related to the process (eg. for messaging, logging) and remove its process directory.
     /// # Examples
     /// ```
     /// use proc_heim::{manager::ProcessManager, model::command::Cmd};

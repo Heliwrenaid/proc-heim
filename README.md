@@ -137,4 +137,7 @@ assert_eq!("1: Second message", msg);
 let result = process_handle.kill().await;
 assert!(result.is_ok());
 ```
+
+// TODO: add link to integration tests as extra examples. (+ Update lib docs)
 ## License
+// TODO: license + installation + docs

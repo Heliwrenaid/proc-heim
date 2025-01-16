@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use crate::process::ProcessId;
 
-pub struct WorkingDir {
+#[derive(Clone, Debug)]
+pub(crate) struct WorkingDir {
     dir: PathBuf,
 }
 

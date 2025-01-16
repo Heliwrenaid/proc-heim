@@ -72,7 +72,7 @@ async fn test_process_handle_wrapper() {
 
 #[tokio::test]
 async fn should_kill_process() {
-    let (_dir, manager_handle) = create_process_manager();
+    let (dir, manager_handle) = create_process_manager();
     let script = build_echo_script(
         ScriptingLanguage::Bash,
         BASH_ECHO_SCRIPT,
@@ -84,7 +84,11 @@ async fn should_kill_process() {
     let process_data = handle.get_process_info().await.unwrap();
     assert!(process_data.is_running());
 
+    let process_dir = dir.path().join(handle.id().to_string());
+
+    assert!(process_dir.exists());
     assert!(handle.kill().await.is_ok());
+    assert!(!process_dir.exists());
 
     let result = handle.get_process_info().await;
     assert!(matches!(
