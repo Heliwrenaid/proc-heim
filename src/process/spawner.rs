@@ -28,11 +28,11 @@ use super::{
 pub const PROCESS_DATA_DIR_ENV_NAME: &str = "PROCESS_DATA_DIR";
 /// Environment variable representing a named pipe path used to read incoming messages in the child process.
 ///
-/// See [`ProcessManagerHandle::send_message_with_format`](crate::manager::ProcessManagerHandle::send_message_with_format) example.
+/// See [`ProcessManagerHandle::subscribe_message_stream`](crate::manager::ProcessManagerHandle::subscribe_message_stream) example.
 pub const INPUT_PIPE_ENV_NAME: &str = "INPUT_PIPE";
 /// Environment variable representing a named pipe path used to send messages to the parent process.
 ///
-/// See [`ProcessManagerHandle::send_message_with_format`](crate::manager::ProcessManagerHandle::send_message_with_format) example.
+/// See [`ProcessManagerHandle::subscribe_message_stream`](crate::manager::ProcessManagerHandle::subscribe_message_stream) example.
 pub const OUTPUT_PIPE_ENV_NAME: &str = "OUTPUT_PIPE";
 
 pub struct ProcessSpawner {

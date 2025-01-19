@@ -1,13 +1,13 @@
 use std::time::Duration;
 
 use crate::common::create_process_manager;
-use futures::FutureExt;
+
+use futures::{FutureExt, StreamExt, TryStreamExt};
 use proc_heim::{
-    manager::{GetProcessInfoError, LogsQuery},
+    manager::{GetProcessInfoError, LogsQuery, TryMessageStreamExt},
     model::script::ScriptingLanguage,
 };
 use test_utils::{cmd_collection::std_io::echo_cmd, scripts_collection::*};
-use tokio_stream::StreamExt;
 
 mod common;
 mod test_cases;
@@ -34,7 +34,11 @@ async fn test_process_handle_wrapper() {
 
     handle.send_message(message_to_sent).await.unwrap();
 
-    let mut stream = handle.subscribe_message_string_stream().await.unwrap();
+    let mut stream = handle
+        .subscribe_message_stream()
+        .await
+        .unwrap()
+        .into_string_stream();
     let message = stream.try_next().await.unwrap().unwrap();
     assert_eq!(message_to_sent, message);
     assert!(stream.next().now_or_never().is_none());
@@ -101,6 +105,7 @@ async fn should_kill_process() {
 #[tokio::test]
 async fn should_write_and_read_json() {
     use proc_heim::manager::serde::MessageFormat;
+    use proc_heim::manager::{Message, ResultStreamExt};
     use proc_heim::model::script::Script;
 
     let (_dir, manager_handle) = create_process_manager();
@@ -115,22 +120,22 @@ async fn should_write_and_read_json() {
     let handle = manager_handle.spawn_with_handle(script).await.unwrap();
 
     let data1 = "Some message";
-    let message = ExampleMessage {
+    let example_message = ExampleMessage {
         data1: data1.into(),
         ..Default::default()
     };
 
-    handle
-        .send_message_with_format(&message, MessageFormat::Json)
-        .await
-        .unwrap();
+    let message = Message::from_serializable(&example_message, &MessageFormat::Json).unwrap();
+    handle.send_message(message).await.unwrap();
 
     let mut stream = handle
-        .subscribe_message_stream_with_format(MessageFormat::Json)
+        .subscribe_message_stream()
         .await
-        .unwrap();
-    let next_message: ExampleMessage = stream.try_next().await.unwrap().unwrap();
-    assert_eq!(next_message, message);
+        .unwrap()
+        .into_deserialized_stream::<ExampleMessage>(&MessageFormat::Json)
+        .filter_ok();
+    let next_message = stream.next().await.unwrap();
+    assert_eq!(next_message, example_message);
 }
 
 #[tokio::test]

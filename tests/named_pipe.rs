@@ -19,26 +19,6 @@ async fn should_spawn_process_then_communicate_with_it_then_kill() {
 }
 
 proptest! {
-    #[test]
-    fn should_read_structured_message(
-            data1 in "[a-zA-Z0-9]{1,100}",
-            data2 in vec(any::<u8>(), 0..100),
-            data3 in any::<i32>(),
-            data4 in any::<f32>(),
-            data5 in any::<bool>()
-    ) {
-        let cmd = echo_daemon_script();
-        let message = ExampleMessage {
-            data1,
-            data2,
-            data3,
-            data4,
-            data5,
-        };
-        tokio::runtime::Runtime::new().unwrap()
-            .block_on(test_cases::should_read_structured_message(cmd.clone(), message));
-    }
-
     #[cfg(all(feature = "json", feature = "message-pack"))]
     #[test]
     fn should_read_message_with_different_formats(
@@ -70,6 +50,7 @@ proptest! {
     }
 }
 
+#[cfg(any(feature = "json", feature = "message-pack"))]
 #[tokio::test]
 async fn should_write_json_message_and_read_part_of_it() {
     test_cases::should_write_json_message_and_read_part_of_it(echo_json_script).await;

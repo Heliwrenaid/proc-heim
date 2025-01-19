@@ -3,12 +3,13 @@ use std::time::Duration;
 
 use crate::manager::{
     GetLogsError, GetProcessInfoError, KillProcessError, LogsQuery, ProcessId, ProcessInfo,
-    ProcessManagerHandle, ReadMessageError, ReceiveMessageBytesError, ReceiveMessageError,
-    WriteMessageError,
+    ProcessManagerHandle, ReadMessageError, ReceiveMessageError, WriteMessageError,
 };
 
 use tokio::task::JoinHandle;
 use tokio_stream::Stream;
+
+use super::message::Message;
 
 /// `ProcessManagerHandle` wrapper used to interact with only one spawned process.
 ///
@@ -35,38 +36,18 @@ impl ProcessHandle {
     }
 
     /// See [`ProcessManagerHandle::send_message`] docs.
-    pub async fn send_message<T, E>(&self, data: T) -> Result<(), WriteMessageError>
+    pub async fn send_message<M>(&self, message: M) -> Result<(), WriteMessageError>
     where
-        T: TryInto<Vec<u8>, Error = E>,
-        E: Debug,
+        M: Into<Message>,
     {
-        self.handle.send_message::<T, E>(self.id, data).await
-    }
-
-    /// See [`ProcessManagerHandle::subscribe_message_bytes_stream`] docs.
-    pub async fn subscribe_message_bytes_stream(
-        &self,
-    ) -> Result<impl Stream<Item = Result<Vec<u8>, ReceiveMessageBytesError>>, ReadMessageError>
-    {
-        self.handle.subscribe_message_bytes_stream(self.id).await
-    }
-
-    /// See [`ProcessManagerHandle::subscribe_message_string_stream`] docs.
-    pub async fn subscribe_message_string_stream(
-        &self,
-    ) -> Result<impl Stream<Item = Result<String, ReceiveMessageError>>, ReadMessageError> {
-        self.handle.subscribe_message_string_stream(self.id).await
+        self.handle.send_message(self.id, message).await
     }
 
     /// See [`ProcessManagerHandle::subscribe_message_stream`] docs.
-    pub async fn subscribe_message_stream<T, E>(
+    pub async fn subscribe_message_stream(
         &self,
-    ) -> Result<impl Stream<Item = Result<T, ReceiveMessageError>>, ReadMessageError>
-    where
-        T: TryFrom<Vec<u8>, Error = E>,
-        E: Debug,
-    {
-        self.handle.subscribe_message_stream::<T, E>(self.id).await
+    ) -> Result<impl Stream<Item = Result<Message, ReceiveMessageError>>, ReadMessageError> {
+        self.handle.subscribe_message_stream(self.id).await
     }
 
     /// See [`ProcessManagerHandle::get_logs_stdout`] docs.
@@ -95,32 +76,5 @@ impl ProcessHandle {
     /// See [`ProcessManagerHandle::kill`] docs.
     pub async fn kill(&self) -> Result<(), KillProcessError> {
         self.handle.kill(self.id).await
-    }
-}
-
-#[cfg(any(feature = "json", feature = "message-pack"))]
-use super::serde::MessageFormat;
-
-#[cfg(any(feature = "json", feature = "message-pack"))]
-impl ProcessHandle {
-    /// See [`ProcessManagerHandle::subscribe_message_stream_with_format`] docs.
-    pub async fn subscribe_message_stream_with_format<T: serde::de::DeserializeOwned>(
-        &self,
-        format: MessageFormat,
-    ) -> Result<impl Stream<Item = Result<T, ReceiveMessageError>>, ReadMessageError> {
-        self.handle
-            .subscribe_message_stream_with_format::<T>(self.id, format)
-            .await
-    }
-
-    /// See [`ProcessManagerHandle::send_message_with_format`] docs.
-    pub async fn send_message_with_format<T: serde::Serialize>(
-        &self,
-        data: T,
-        format: MessageFormat,
-    ) -> Result<(), WriteMessageError> {
-        self.handle
-            .send_message_with_format(self.id, data, format)
-            .await
     }
 }

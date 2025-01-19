@@ -38,16 +38,11 @@ async fn should_run_custom_script() {
     );
 
     let id = handle.spawn(script).await.unwrap();
-    let mut stream = handle.subscribe_message_bytes_stream(id).await.unwrap();
+    let mut stream = handle.subscribe_message_stream(id).await.unwrap();
     let message = stream.try_next().await.unwrap().unwrap();
     assert_eq!(
-        dir.path()
-            .join(arg)
-            .to_path_buf()
-            .to_str()
-            .unwrap()
-            .as_bytes(),
-        message
+        dir.path().join(arg).to_path_buf().to_str().unwrap(),
+        message.try_into_string().unwrap()
     );
 }
 
@@ -86,9 +81,9 @@ async fn test_script(
 
     handle.send_message(id, message_to_sent).await.unwrap();
 
-    let mut stream = handle.subscribe_message_bytes_stream(id).await.unwrap();
+    let mut stream = handle.subscribe_message_stream(id).await.unwrap();
     let message = stream.try_next().await.unwrap().unwrap();
-    assert_eq!(message_to_sent.as_bytes(), message);
+    assert_eq!(message_to_sent.as_bytes(), &message.into_bytes());
     assert!(stream.next().now_or_never().is_none());
 
     let stdout = handle

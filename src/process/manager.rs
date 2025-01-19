@@ -20,6 +20,7 @@ use crate::working_dir::WorkingDir;
 
 use super::{
     log_reader::{LogReaderError, LogsQuery, LogsQueryType},
+    message::Message,
     spawner::ProcessSpawner,
     ProcessHandle, ProcessInfo, Runnable,
 };
@@ -310,11 +311,7 @@ impl ProcessManagerHandle {
         Ok(ProcessHandle::new(id, self.clone()))
     }
 
-    /// Send a message to the process with given `id`.
-    ///
-    /// The message should be serializable to bytes via `TryInto<Vec<u8>` trait.
-    /// Notice that `\n` character signals the end of the message,
-    /// so message containing `\n` will be truncated to this character.
+    /// Send a [`Message`] to the process with given `id`.
     /// # Examples
     /// ```
     /// use futures::TryStreamExt;
@@ -342,24 +339,17 @@ impl ProcessManagerHandle {
     ///
     /// let process_id = handle.spawn(script).await?;
     /// handle.send_message(process_id, "John").await?;
-    /// let mut stream = handle.subscribe_message_string_stream(process_id).await?;
+    /// let mut stream = handle.subscribe_message_stream(process_id).await?;
     /// let received_msg = stream.try_next().await?.unwrap();
-    /// assert_eq!("Hello John", received_msg);
+    /// assert_eq!("Hello John", received_msg.try_into_string().unwrap());
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn send_message<T, E>(&self, id: ProcessId, data: T) -> Result<(), WriteMessageError>
+    pub async fn send_message<M>(&self, id: ProcessId, message: M) -> Result<(), WriteMessageError>
     where
-        T: TryInto<Vec<u8>, Error = E>,
-        E: Debug,
+        M: Into<Message>,
     {
-        let bytes = data.try_into().map_err(|err| {
-            WriteMessageError::CannotSerializeMessage(format!(
-                "Cannot serialize message to bytes: {err:?}"
-            ))
-        })?;
-
-        if let Some(data) = Self::into_bytes_with_eol_char(bytes) {
+        if let Some(data) = Self::into_bytes_with_eol_char(message.into().bytes) {
             let (responder, receiver) = oneshot::channel();
             let msg = ProcessManagerMessage::WriteMessage {
                 id,
@@ -383,12 +373,13 @@ impl ProcessManagerHandle {
         }
     }
 
-    //TODO: merge all subscribe_* methods into special type eg. MessagesSubscriber
     /// Access asynchronous message stream from the process with given `id`.
     ///
-    /// Messages will be returned as raw bytes, but with removed new line character (`\n`) from the end of the message.
+    /// Messages read from the process are returned as [`Message`] types,
+    /// allowing a convenient conversion into raw bytes, string or even `Rust` types, which implement `Deserialize` trait.
     /// If message stream was successfully subscribed, then `Ok(stream)` is returned, otherwise a [`ReadMessageError`] is returned.
-    /// A stream doesn't yield raw messages, instead each message is wrapped by `Result` with [`ReceiveMessageBytesError`] error type.
+    /// A stream doesn't yield raw messages, instead each message is wrapped by `Result` with [`ReceiveMessageError`] error type.
+    /// For convenient stream transformation use [`TryMessageStreamExt`](trait@crate::manager::TryMessageStreamExt) and [`MessageStreamExt`](trait@crate::manager::MessageStreamExt) traits.
     ///
     /// `ProcessManager` for each child process assigns a buffer for messages received from it,
     /// which can be configured via [`CmdOptions::set_message_output_buffer_capacity`](crate::model::command::CmdOptions::set_message_output_buffer_capacity).
@@ -397,15 +388,18 @@ impl ProcessManagerHandle {
     /// then the messages are buffered up to the given capacity value.
     /// If the buffer limit is reached and the process sends a new message,
     /// the "oldest" buffered message will be removed. Therefore, when retrieving next message from the stream,
-    /// the [`ReceiveMessageBytesError::LostMessages`] error will be returned, indicating how many buffered messages have been removed.
+    /// the [`ReceiveMessageError::LostMessages`] error will be returned, indicating how many buffered messages have been removed.
     ///
     /// The messages stream can be subscribed multiple times and each subscriber will receive a one copy of the original message.
     /// Notice that buffer mentioned earlier is created not per subscriber, but per each process, so when one of subscribers not read messages, the buffer will fill up.
     /// # Examples
+    ///
+    /// Reading a message via standard IO:
+    ///
     /// ```
     /// use futures::TryStreamExt;
     /// use proc_heim::{
-    ///     manager::ProcessManager,
+    ///     manager::{ProcessManager, TryMessageStreamExt},
     ///     model::command::{Cmd, CmdOptions, MessagingType},
     /// };
     ///
@@ -422,75 +416,74 @@ impl ProcessManagerHandle {
     ///
     /// // read a message from spawned process
     /// let process_id = handle.spawn(cmd).await?;
-    /// let mut stream = handle.subscribe_message_bytes_stream(process_id).await?;
+    /// let mut stream = handle.subscribe_message_stream(process_id).await?
+    ///     .into_string_stream();
     /// let received_msg = stream.try_next().await?.unwrap();
-    /// assert_eq!(msg.as_bytes(), received_msg);
+    /// assert_eq!(msg, received_msg);
     /// # Ok(())
     /// # }
-    pub async fn subscribe_message_bytes_stream(
+    /// ```
+    ///
+    /// Reading messages via named pipes:
+    ///
+    /// ```
+    /// use futures::{StreamExt, TryStreamExt};
+    /// use proc_heim::{
+    ///     manager::{ProcessManager, TryMessageStreamExt, ResultStreamExt},
+    ///     model::{
+    ///         command::CmdOptions,
+    ///         script::{Script, ScriptingLanguage},
+    ///     },
+    /// };
+    /// use std::path::PathBuf;
+    ///
+    /// # #[tokio::main] async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let working_dir = tempfile::tempdir()?.into_path();
+    /// let handle = ProcessManager::spawn(working_dir)?;
+    /// let script = Script::with_options(
+    ///     ScriptingLanguage::Bash,
+    ///     r#"
+    ///     counter=0
+    ///     while read msg; do
+    ///         echo "$counter: $msg" > $OUTPUT_PIPE
+    ///         counter=$((counter + 1))
+    ///     done < $INPUT_PIPE
+    ///     "#,
+    ///     CmdOptions::with_named_pipe_messaging(), // we want to send messages bidirectionally
+    /// );
+    ///
+    /// // We can use "spawn_with_handle" instead of "spawn" to get "ProcessHandle",
+    /// // which mimics the "ProcessManagerHandle" API,
+    /// // but without having to pass the process ID to each method call.
+    /// let process_handle = handle.spawn_with_handle(script).await?;
+    ///
+    /// process_handle.send_message("First message").await?;
+    /// // We can send a next message without causing a deadlock here.
+    /// // This is possible because the response to the first message
+    /// // will be read by a dedicated Tokio task,
+    /// // spawned automatically by the Process Manager.
+    /// process_handle.send_message("Second message").await?;
+    ///
+    /// let mut stream = process_handle
+    ///     .subscribe_message_stream()
+    ///     .await?
+    ///     .into_string_stream();
+    ///
+    /// assert_eq!("0: First message", stream.try_next().await?.unwrap());
+    /// assert_eq!("1: Second message", stream.try_next().await?.unwrap());
+    /// # Ok(()) }
+    /// ```
+    pub async fn subscribe_message_stream(
         &self,
         id: ProcessId,
-    ) -> Result<impl Stream<Item = Result<Vec<u8>, ReceiveMessageBytesError>>, ReadMessageError>
-    {
+    ) -> Result<impl Stream<Item = Result<Message, ReceiveMessageError>>, ReadMessageError> {
         let (responder, receiver) = oneshot::channel();
         let msg = ProcessManagerMessage::SubscribeMessageStream { id, responder };
         let _ = self.sender.send(msg).await;
         let message_receiver = receiver.await??;
-        let stream = BroadcastStream::new(message_receiver).map(|v| v.map_err(Into::into));
+        let stream = BroadcastStream::new(message_receiver)
+            .map(|v| v.map(Message::from_bytes).map_err(Into::into));
         Ok(stream)
-    }
-
-    /// Access asynchronous message stream from the process with given `id`.
-    ///
-    /// It works like a [`Self::subscribe_message_bytes_stream`], but the returned stream yields messages of type `T`.
-    /// If the message cannot be deserialized, the stream will return [`ReceiveMessageError::CannotDeserializeMessage`] error.
-    pub async fn subscribe_message_stream<T, E>(
-        &self,
-        id: ProcessId,
-    ) -> Result<impl Stream<Item = Result<T, ReceiveMessageError>>, ReadMessageError>
-    where
-        T: TryFrom<Vec<u8>, Error = E>,
-        E: Debug,
-    {
-        Ok(self
-            .subscribe_message_bytes_stream(id)
-            .await?
-            .map(Self::to_message))
-    }
-
-    fn to_message<T: TryFrom<Vec<u8>, Error = E>, E: Debug>(
-        bytes: Result<Vec<u8>, ReceiveMessageBytesError>,
-    ) -> Result<T, ReceiveMessageError> {
-        let bytes = bytes?;
-        T::try_from(bytes).map_err(|err| {
-            ReceiveMessageError::CannotDeserializeMessage(format!(
-                "Cannot deserialize data from raw bytes: {err:?}"
-            ))
-        })
-    }
-
-    /// Access asynchronous message stream from the process with given `id`.
-    ///
-    /// It works like a [`Self::subscribe_message_stream`], but the returned stream yields messages as strings.
-    pub async fn subscribe_message_string_stream(
-        &self,
-        id: ProcessId,
-    ) -> Result<impl Stream<Item = Result<String, ReceiveMessageError>>, ReadMessageError> {
-        Ok(self
-            .subscribe_message_bytes_stream(id)
-            .await?
-            .map(Self::to_string_message))
-    }
-
-    fn to_string_message(
-        bytes: Result<Vec<u8>, ReceiveMessageBytesError>,
-    ) -> Result<String, ReceiveMessageError> {
-        let bytes = bytes?;
-        String::from_utf8(bytes).map_err(|err| {
-            ReceiveMessageError::CannotDeserializeMessage(format!(
-                "Cannot deserialize data from raw bytes to string: {err:?}"
-            ))
-        })
     }
 
     /// Fetch logs from standard `output` stream, produced by a process with given `id`.
@@ -707,155 +700,26 @@ impl ProcessManagerHandle {
         receiver.await??;
         Ok(())
     }
-}
 
-#[cfg(any(feature = "json", feature = "message-pack"))]
-use super::serde::{MessageFormat, SerdeUtil};
-
-#[cfg(any(feature = "json", feature = "message-pack"))]
-impl ProcessManagerHandle {
-    /// Access asynchronous message stream from the process with given `id`.
-    ///
-    /// It works like a [`Self::subscribe_message_stream`], but the returned stream yields messages as deserialized `Rust` data types.
-    /// # Examples
-    /// ```
-    /// use futures::TryStreamExt;
-    /// use proc_heim::manager::serde::MessageFormat;
-    /// use proc_heim::{
-    ///     manager::ProcessManager,
-    ///     model::command::{Cmd, CmdOptions, MessagingType},
-    /// };
-    /// use serde::{Serialize, Deserialize};
-    ///
-    /// #[derive(Debug, Deserialize, PartialEq)]
-    /// pub struct ExampleMessage {
-    ///     pub field1: String,
-    ///     pub field2: i32,
-    /// }
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///
-    /// let working_dir = tempfile::tempdir()?.into_path();
-    /// let handle = ProcessManager::spawn(working_dir)?;
-    /// let json_msg = r#"{ "field1": "Hello", "field2": 123 }"#;
-    /// let cmd = Cmd::with_args_and_options(
-    ///     "echo",
-    ///     [json_msg],
-    ///     CmdOptions::with_message_output(MessagingType::StandardIo),
-    /// );
-    ///
-    /// let process_id = handle.spawn(cmd).await?;
-    ///
-    /// let expected_msg = ExampleMessage {
-    ///     field1: "Hello".into(),
-    ///     field2: 123,
-    /// };
-    ///
-    /// let mut stream = handle
-    ///     .subscribe_message_stream_with_format(process_id, MessageFormat::Json)
-    ///     .await?;
-    /// let received_msg = stream.try_next().await?.unwrap();
-    /// assert_eq!(expected_msg, received_msg);
-    /// Ok(())
-    /// }
-    /// ```
-    pub async fn subscribe_message_stream_with_format<T: serde::de::DeserializeOwned>(
-        &self,
-        id: ProcessId,
-        format: MessageFormat,
-    ) -> Result<impl Stream<Item = Result<T, ReceiveMessageError>>, ReadMessageError> {
-        Ok(self
-            .subscribe_message_bytes_stream(id)
-            .await?
-            .map(move |bytes| Self::deserialize_message(bytes, &format)))
-    }
-
-    fn deserialize_message<T: serde::de::DeserializeOwned>(
-        bytes: Result<Vec<u8>, ReceiveMessageBytesError>,
-        format: &MessageFormat,
-    ) -> Result<T, ReceiveMessageError> {
-        SerdeUtil::deserialize(&bytes?, format)
-            .map_err(|err| ReceiveMessageError::CannotDeserializeMessage(err.to_string()))
-    }
-
-    // NOTE: example referred from OUTPUT_PIPE_ENV_NAME, INPUT_PIPE_ENV_NAME docs
-    /// Send a message (as `Rust` serializable type) to the process with given `id`.
-    /// # Examples
-    /// ```
-    /// use futures::TryStreamExt;
-    /// use proc_heim::manager::serde::MessageFormat;
-    /// use proc_heim::{
-    ///     manager::ProcessManager,
-    ///     model::{
-    ///         command::CmdOptions,
-    ///         script::{Script, ScriptingLanguage},
-    ///     },
-    /// };
-    /// use serde::Serialize;
-    ///
-    /// #[derive(Debug, Serialize)]
-    /// pub struct ExampleMessage {
-    ///     pub field1: String,
-    ///     pub field2: i32,
-    /// }
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let working_dir = tempfile::tempdir()?.into_path();
-    ///     let handle = ProcessManager::spawn(working_dir)?;
-    ///     let script = Script::with_options(
-    ///         ScriptingLanguage::Bash,
-    ///         r#"
-    ///         read msg < $INPUT_PIPE
-    ///         echo "$msg" | jq -r .field1 > $OUTPUT_PIPE
-    ///         "#,
-    ///         CmdOptions::with_named_pipe_messaging(),
-    ///     );
-    ///
-    ///     let process_id = handle.spawn(script).await?;
-    ///
-    ///     let msg = ExampleMessage {
-    ///         field1: "Some string message".into(),
-    ///         field2: 44,
-    ///     };
-    ///
-    ///     handle.send_message_with_format(process_id, &msg, MessageFormat::Json).await?;
-    ///
-    ///     let mut stream = handle.subscribe_message_string_stream(process_id).await?;
-    ///     let received_msg = stream.try_next().await?.unwrap();
-    ///     assert_eq!(msg.field1, received_msg);
-    ///     Ok(())
-    /// }
-    /// ```
-    pub async fn send_message_with_format<T: serde::Serialize>(
-        &self,
-        id: ProcessId,
-        data: T,
-        format: MessageFormat,
-    ) -> Result<(), WriteMessageError> {
-        let bytes = SerdeUtil::serialize(&data, &format)
-            .map_err(|err| WriteMessageError::CannotSerializeMessage(err.to_string()))?;
-        self.send_message(id, bytes).await
-    }
+    // TODO: abort ProcessManager
 }
 
 /// Error type returned when reading message bytes from a messages stream.
 #[derive(thiserror::Error, Debug)]
-pub enum ReceiveMessageBytesError {
+pub enum ReceiveMessageError {
     /// Error indicating that some buffered messages were deleted due to buffer capacity overflow.
-    /// If you don't care about deleted messages, you can ignore this error.
+    /// If you don't care about deleted messages, you can ignore this error (manually or using [`TryMessageStreamExt::ignore_lost_messages`](crate::manager::TryMessageStreamExt::ignore_lost_messages)).
     /// Includes the number of deleted messages.
-    /// See [`ProcessManagerHandle::subscribe_message_bytes_stream`] for more information.
+    /// See [`ProcessManagerHandle::subscribe_message_stream`] for more information.
     #[error("Lost {0} number of messages due to buffer capacity overflow")]
     LostMessages(u64),
 }
 
 /// Error type returned when reading a deserializable message from a messages stream.
 #[derive(thiserror::Error, Debug)]
-pub enum ReceiveMessageError {
+pub enum ReceiveDeserializedMessageError {
     /// Error indicating that some buffered messages were deleted due to buffer capacity overflow.
-    /// See [`ReceiveMessageBytesError`] for more information.
+    /// See [`ReceiveMessageError`] for more information.
     #[error("Lost {0} number of messages due to buffer capacity overflow")]
     LostMessages(u64),
     /// Error indicating that a message cannot be deserialized from bytes. Includes error message.
@@ -863,19 +727,19 @@ pub enum ReceiveMessageError {
     CannotDeserializeMessage(String),
 }
 
-impl From<BroadcastStreamRecvError> for ReceiveMessageBytesError {
+impl From<BroadcastStreamRecvError> for ReceiveMessageError {
     fn from(err: BroadcastStreamRecvError) -> Self {
         match err {
-            BroadcastStreamRecvError::Lagged(size) => ReceiveMessageBytesError::LostMessages(size),
+            BroadcastStreamRecvError::Lagged(size) => ReceiveMessageError::LostMessages(size),
         }
     }
 }
 
-impl From<ReceiveMessageBytesError> for ReceiveMessageError {
-    fn from(value: ReceiveMessageBytesError) -> Self {
+impl From<ReceiveMessageError> for ReceiveDeserializedMessageError {
+    fn from(value: ReceiveMessageError) -> Self {
         match value {
-            ReceiveMessageBytesError::LostMessages(number) => {
-                ReceiveMessageError::LostMessages(number)
+            ReceiveMessageError::LostMessages(number) => {
+                ReceiveDeserializedMessageError::LostMessages(number)
             }
         }
     }

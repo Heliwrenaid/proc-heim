@@ -97,7 +97,7 @@
 //! ```no_run
 //! use futures::TryStreamExt;
 //! use proc_heim::{
-//!     manager::ProcessManager,
+//!     manager::{ProcessManager, TryMessageStreamExt},
 //!     model::{
 //!         command::CmdOptions,
 //!         script::{Script, ScriptingLanguage},
@@ -132,7 +132,10 @@
 //! // spawned automatically by the Process Manager.
 //! process_handle.send_message("Second message").await?;
 //!
-//! let mut stream = process_handle.subscribe_message_string_stream().await?;
+//! let mut stream = process_handle
+//!     .subscribe_message_stream()
+//!     .await?
+//!     .into_string_stream();
 //!
 //! let msg = stream.try_next().await?.unwrap();
 //! assert_eq!("0: First message", msg);
@@ -202,16 +205,17 @@ pub mod manager {
     //!
     //! See [`ProcessManager`] and [`ProcessManagerHandle`] docs for more information.
     pub use crate::process::{
-        GetLogsError, GetProcessInfoError, KillProcessError, LogsQuery, ProcessHandle, ProcessId,
-        ProcessInfo, ProcessManager, ProcessManagerHandle, ReadMessageError,
-        ReceiveMessageBytesError, ReceiveMessageError, SpawnProcessError, WriteMessageError,
-        INPUT_PIPE_ENV_NAME, OUTPUT_PIPE_ENV_NAME, PROCESS_DATA_DIR_ENV_NAME,
+        GetLogsError, GetProcessInfoError, KillProcessError, LogsQuery, Message, MessageStreamExt,
+        ProcessHandle, ProcessId, ProcessInfo, ProcessManager, ProcessManagerHandle,
+        ReadMessageError, ReceiveDeserializedMessageError, ReceiveMessageError, ResultStreamExt,
+        SpawnProcessError, TryMessageStreamExt, WriteMessageError, INPUT_PIPE_ENV_NAME,
+        OUTPUT_PIPE_ENV_NAME, PROCESS_DATA_DIR_ENV_NAME,
     };
 
     #[cfg(any(feature = "json", feature = "message-pack"))]
     pub mod serde {
         //! Types representing messages format and encoding.
-        pub use crate::process::MessageFormat;
+        pub use crate::process::{MessageFormat, SerdeError};
 
         #[cfg(feature = "message-pack")]
         pub use crate::process::Encoding;
