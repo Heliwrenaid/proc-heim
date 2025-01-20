@@ -1,8 +1,6 @@
 # Proc-heim
 
-`Proc-heim` is a library for running and managing short-lived and long-lived processes using asynchronous API. A new process can be created by running either command or script. `Proc-heim` is hosted on
-[crates.io](https://crates.io/crates/proc-heim), with API
-Documentation on [docs.rs](https://docs.rs/proc-heim/).
+`Proc-heim` is a library for running and managing short-lived and long-lived processes using asynchronous API. A new process can be created by running either command or script.
 
 ## Features
 `Proc-heim` internally uses [tokio::process](https://docs.rs/tokio/latest/tokio/process/index.html) for executing processes and provides all its functionality plus additional features:
@@ -141,11 +139,3 @@ assert!(result.is_ok());
 ```
 
 For more examples, see [integration tests](https://github.com/Heliwrenaid/proc-heim/tree/main/tests).
-
-## License
-Licensed under either of <a href="LICENSE-APACHE">Apache License, Version
-2.0</a> or <a href="LICENSE-MIT">MIT license</a> at your option.
-
-Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in <b>proc-heim</b> by you, as defined in the Apache-2.0 license, shall be
-dual licensed as above, without any additional terms or conditions.

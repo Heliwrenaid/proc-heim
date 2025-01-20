@@ -1,3 +1,5 @@
+#![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_auto_cfg))]
+
 //! # Proc-heim
 //!
 //! `Proc-heim` is a library for running and managing short-lived and long-lived processes using asynchronous API. A new process can be created by running either command or script.
@@ -147,6 +149,8 @@
 //! assert!(result.is_ok());
 //! # Ok(()) }
 //! ```
+//!
+//! For more examples, see [integration tests](https://github.com/Heliwrenaid/proc-heim/tree/main/tests).
 mod process;
 mod working_dir;
 
@@ -221,4 +225,3 @@ pub mod manager {
         pub use crate::process::Encoding;
     }
 }
-// TODO: add info about features. (and in docs in proper places eg. for serde module)

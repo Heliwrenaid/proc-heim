@@ -1,6 +1,6 @@
 workspace = { members = ["test-utils"] }
 [package]
-name = "proc-heim"
+name = "proc-heim" # TODO: change to proc_heim ?
 version = "0.1.0"
 edition = "2021"
 
@@ -35,3 +35,13 @@ default = []
 builder = ["dep:derive_builder"]
 json = ["dep:serde", "dep:serde_json"]
 message-pack = ["dep:serde", "dep:rmp-serde", "dep:hex", "dep:base64"]
+
+
+[package.metadata.docs.rs]
+all-features = true
+
+[build-dependencies]
+rustc_version = "0.4.0"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(CHANNEL_NIGHTLY)'] }
