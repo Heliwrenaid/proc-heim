@@ -7,7 +7,10 @@ use std::{
 };
 
 use tokio::{
-    sync::{broadcast, mpsc, oneshot},
+    sync::{
+        broadcast, mpsc,
+        oneshot::{self},
+    },
     task::JoinHandle,
 };
 use tokio_stream::{
@@ -58,6 +61,9 @@ enum ProcessManagerMessage {
         id: ProcessId,
         responder: oneshot::Sender<Result<ProcessInfo, GetProcessInfoError>>,
     },
+    Abort {
+        responder: oneshot::Sender<Result<(), AbortError>>,
+    },
 }
 
 /// `ProcessManager` provides asynchronous API for spawning and managing multiple processes.
@@ -79,6 +85,7 @@ pub struct ProcessManager {
     process_spawner: ProcessSpawner,
     processes: HashMap<ProcessId, Process>,
     receiver: mpsc::Receiver<ProcessManagerMessage>,
+    is_aborted: bool,
 }
 
 impl ProcessManager {
@@ -101,6 +108,7 @@ impl ProcessManager {
             process_spawner: ProcessSpawner::new(working_dir),
             receiver,
             processes: HashMap::new(),
+            is_aborted: false,
         };
         tokio::spawn(async move { manager.run().await });
         Ok(ProcessManagerHandle::new(sender))
@@ -113,8 +121,16 @@ impl ProcessManager {
     }
 
     async fn run(&mut self) {
-        while let Some(msg) = self.receiver.recv().await {
-            self.handle_message(msg).await;
+        loop {
+            if self.is_aborted {
+                break;
+            } else {
+                if let Some(msg) = self.receiver.recv().await {
+                    self.handle_message(msg).await;
+                } else {
+                    break;
+                }
+            }
         }
     }
 
@@ -151,6 +167,10 @@ impl ProcessManager {
             }
             ProcessManagerMessage::GetProcessInfo { id, responder } => {
                 let result = self.get_process_info(id);
+                let _ = responder.send(result);
+            }
+            ProcessManagerMessage::Abort { responder } => {
+                let result = self.abort().await;
                 let _ = responder.send(result);
             }
         }
@@ -246,6 +266,16 @@ impl ProcessManager {
         let pid = process.child.id();
         let exit_status = process.child.try_wait()?;
         Ok(ProcessInfo::new(pid, exit_status))
+    }
+
+    async fn abort(&mut self) -> Result<(), AbortError> {
+        self.is_aborted = true;
+        self.receiver.close();
+        let ids: Vec<ProcessId> = self.processes.keys().cloned().collect();
+        for id in ids {
+            let _ = self.kill_process(id).await;
+        }
+        Ok(())
     }
 }
 
@@ -701,7 +731,19 @@ impl ProcessManagerHandle {
         Ok(())
     }
 
-    // TODO: abort ProcessManager
+    /// Abort a [`ProcessManager`] task associated with this handle.
+    pub async fn abort(&self) -> Result<(), AbortError> {
+        let (responder, receiver) = oneshot::channel();
+        let msg = ProcessManagerMessage::Abort { responder };
+        self.sender
+            .send(msg)
+            .await
+            .map_err(|_| AbortError::ManagerAlreadyAborted)?;
+        receiver
+            .await
+            .map_err(|_| AbortError::ManagerAlreadyAborted)??;
+        Ok(())
+    }
 }
 
 /// Error type returned when reading message bytes from a messages stream.
@@ -874,4 +916,12 @@ pub enum GetProcessInfoError {
     /// An unexpected IO error occurred when trying to get an information about the process.
     #[error(transparent)]
     UnExpectedIoError(#[from] io::Error),
+}
+
+/// Error type returned when trying to abort a [`ProcessManager`] task.
+#[derive(thiserror::Error, Debug)]
+pub enum AbortError {
+    /// Cannot communicate with spawned process manager. Probably process manager task has been aborted.
+    #[error("Cannot communicate with spawned process manager")]
+    ManagerAlreadyAborted,
 }
