@@ -1,12 +1,11 @@
 workspace = { members = ["test-utils"] }
 [package]
 name = "proc-heim"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Library for running and managing short-lived and long-lived processes using asynchronous API"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/uzytkownik/nazwa_crate"
-documentation = "https://github.com/Heliwrenaid/proc-heim"
+repository = "https://github.com/Heliwrenaid/proc-heim"
 readme = "crates-io.md"
 keywords = ["process", "subprocess", "command", "scripts", "manager"]
 categories = ["asynchronous", "command-line-utilities"]
