@@ -46,7 +46,7 @@ async fn should_run_custom_script() {
     );
 }
 
-// TODO: should test also messaging via StandardIo
+// TODO: should add test also for messaging via StandardIo
 #[tokio::test]
 async fn test_scripts_in_different_languages() {
     let (_dir, handle) = create_process_manager();
