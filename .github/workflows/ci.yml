@@ -12,7 +12,7 @@ env:
   CARGO_TERM_COLOR: always
   RUST_VERSION_STABLE: 1.77.2
 
-# TODO: add task to test building docs with different features enabled
+# TODO: add task to test building docs with different features enabled 
 jobs:
   test:
     name: Test
@@ -56,6 +56,21 @@ jobs:
       - name: Linting
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION_STABLE }}
+      - name: Test documentation build (all features)
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --all-features
+      - name: Test documentation build (json feature)
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --features json
+      - name: Test documentation build (message-pack feature)
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --features message-pack
   coverage:
     name: Code coverage
     runs-on: ubuntu-latest

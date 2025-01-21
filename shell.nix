@@ -14,7 +14,7 @@ pkgs.mkShell {
     export LLVM_COV=$(which llvm-cov)
     export LLVM_PROFDATA=$(which llvm-profdata)
     if [ -z $(cargo --list | grep llvm-cov) ]; then
-      cargo install cargo-llvm-cov
+      cargo install cargo-llvm-cov@0.6.15
     fi
   '';
 }
