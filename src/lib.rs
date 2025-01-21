@@ -169,11 +169,8 @@ pub mod model {
         };
 
         /// Alternative API for creating [`Cmd`] and [`CmdOptions`] structures.
-        #[cfg(feature = "builder")]
         pub mod builder {
-            pub use crate::process::{
-                CmdBuilder, CmdBuilderError, CmdOptionsBuilder, CmdOptionsBuilderError,
-            };
+            pub use crate::process::{CmdBuilder, CmdBuilderError, CmdOptionsBuilder};
         }
     }
 
@@ -191,7 +188,6 @@ pub mod model {
         };
 
         /// Alternative API for creating [`Script`] structure.
-        #[cfg(feature = "builder")]
         pub mod builder {
             pub use crate::process::{ScriptBuilder, ScriptBuilderError};
         }

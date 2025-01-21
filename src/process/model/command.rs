@@ -22,7 +22,6 @@ use super::Runnable;
 ///
 /// Note that using input/output redirection symbols (eg. `|`, `>>`, `2>`) as command arguments will fail.
 /// Instead use [`Script`](struct@crate::model::script::Script).
-#[cfg(not(feature = "builder"))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Cmd {
     pub(crate) cmd: String,
@@ -247,7 +246,6 @@ impl Default for BufferCapacity {
 ///
 /// It is also possible to set logging in order to allow child process to produce logs
 /// which, unlike messages, are stored permanently and therefore can be read multiple times by parent process.
-#[cfg(not(feature = "builder"))]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CmdOptions {
     pub(crate) current_dir: Option<PathBuf>,
@@ -401,7 +399,7 @@ impl CmdOptions {
     }
 }
 
-fn validate_stdout_config(
+pub(super) fn validate_stdout_config(
     messaging_type: Option<&MessagingType>,
     logging_type: Option<&LoggingType>,
 ) -> Result<(), CmdOptionsError> {
@@ -453,74 +451,5 @@ pub enum LoggingType {
 impl Runnable for Cmd {
     fn bootstrap_cmd(&self, _process_dir: &Path) -> Result<Cmd, String> {
         Ok(self.clone())
-    }
-}
-
-#[cfg(feature = "builder")]
-pub use builder::*;
-
-#[cfg(feature = "builder")]
-pub mod builder {
-    use super::*;
-    use derive_builder::Builder;
-
-    /// `Cmd` represents a single command.
-    ///
-    /// It requires at least to set a command name.
-    /// Command's arguments and options are optional.
-    ///
-    /// Note that using input/output redirection symbols (eg. `|`, `>>`, `2>`) as command arguments will fail.
-    /// Instead use [`Script`](struct@crate::model::script::Script).
-    #[derive(Debug, Clone, Builder, PartialEq, Eq)]
-    pub struct Cmd {
-        #[builder(setter(into))]
-        pub(crate) cmd: String,
-        #[builder(setter(into, strip_option), default)]
-        pub(crate) args: Option<Vec<String>>,
-        #[builder(setter(into), default)]
-        pub(crate) options: CmdOptions,
-    }
-
-    /// `CmdOptions` are used to describe command's additional settings.
-    ///
-    /// It allows to configure command's input/outputs, working_directory and environment variables.
-    ///
-    /// Command's input allows to send messages from parent process, and receive them in spawned (child) process.
-    /// Whereas the message output of the command is used for communication in the opposite direction.
-    /// Communication with a process can be done using standard I/O or named pipes.
-    ///
-    /// It is also possible to set logging in order to allow child process to produce logs
-    /// which, unlike messages, are stored permanently and therefore can be read multiple times by parent process.
-    #[derive(Debug, Clone, Default, Builder, PartialEq, Eq)]
-    #[builder(build_fn(validate = "Self::validate"))]
-    pub struct CmdOptions {
-        #[builder(setter(into, strip_option), default)]
-        pub(crate) current_dir: Option<PathBuf>,
-        #[builder(setter(into, strip_option), default = "false")]
-        pub(crate) clear_envs: bool,
-        #[builder(setter(into, strip_option), default)]
-        pub(crate) envs: Option<HashMap<String, String>>,
-        #[builder(setter(into, strip_option), default)]
-        pub(crate) envs_to_remove: Option<Vec<String>>,
-        #[builder(setter(into, strip_option), default)]
-        pub(crate) output_buffer_capacity: BufferCapacity,
-        #[builder(setter(into, strip_option), default)]
-        pub(crate) message_input: Option<MessagingType>,
-        #[builder(setter(into, strip_option), default)]
-        pub(crate) message_output: Option<MessagingType>,
-        #[builder(setter(into, strip_option), default)]
-        pub(crate) logging_type: Option<LoggingType>,
-    }
-
-    impl CmdOptionsBuilder {
-        fn validate(&self) -> Result<(), String> {
-            if let (Some(message_output), Some(logging_type)) =
-                (self.message_output.as_ref(), self.logging_type.as_ref())
-            {
-                validate_stdout_config(message_output.as_ref(), logging_type.as_ref())
-                    .map_err(|err| err.to_string())?;
-            }
-            Ok(())
-        }
     }
 }

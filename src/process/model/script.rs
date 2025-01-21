@@ -1,6 +1,4 @@
 use super::{Cmd, CmdOptions, Runnable};
-#[cfg(feature = "builder")]
-use derive_builder::Builder;
 use std::path::Path;
 
 /// Constant used as a placeholder for a script file path. See [`ScriptRunConfig`] docs.
@@ -126,32 +124,11 @@ impl ScriptRunConfig {
 /// Currently, library supports 8 most popular scripting languages, but it is possible to support a custom ones via [`ScriptingLanguage::Other`].
 ///
 /// `Script` stores its content in a file and then executes [`Cmd`](struct@crate::model::command::Cmd) provided by [`Runnable`](trait@crate::model::Runnable) trait implementation.
-#[cfg(not(feature = "builder"))]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Script {
     pub(crate) lang: ScriptingLanguage,
     pub(crate) content: String,
     pub(crate) args: Option<Vec<String>>,
-    pub(crate) options: CmdOptions,
-}
-
-/// `Script` represents a single script.
-///
-/// It requires at least to set a scripting language and content. Script's arguments and options are optional.
-/// [`ScriptingLanguage`] defines the language in which the script is implemented.
-/// Currently, library supports 8 most popular scripting languages, but it is possible to support a custom ones via [`ScriptingLanguage::Other`].
-///
-/// `Script` stores its content in a file and then executes [`Cmd`](struct@crate::model::command::Cmd) provided by [`Runnable`](trait@crate::model::Runnable) trait implementation.
-#[cfg(feature = "builder")]
-#[derive(Debug, Clone, Builder, PartialEq, Eq)]
-pub struct Script {
-    #[builder(setter(into))]
-    pub(crate) lang: ScriptingLanguage,
-    #[builder(setter(into))]
-    pub(crate) content: String,
-    #[builder(setter(into, strip_option), default)]
-    pub(crate) args: Option<Vec<String>>,
-    #[builder(setter(into), default)]
     pub(crate) options: CmdOptions,
 }
 
