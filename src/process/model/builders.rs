@@ -376,7 +376,7 @@ mod tests {
         expected.clear_inherited_envs(clear_envs);
         expected.set_envs(envs.clone());
         expected.remove_env(env_to_remove);
-        expected.set_message_output_buffer_capacity(capacity.clone());
+        expected.set_message_output_buffer_capacity(capacity);
         expected.set_message_input(message_input.clone());
         expected.set_message_output(message_output.clone()).unwrap();
         expected.set_logging_type(logging_type.clone()).unwrap();

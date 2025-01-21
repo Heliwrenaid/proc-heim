@@ -124,12 +124,10 @@ impl ProcessManager {
         loop {
             if self.is_aborted {
                 break;
+            } else if let Some(msg) = self.receiver.recv().await {
+                self.handle_message(msg).await;
             } else {
-                if let Some(msg) = self.receiver.recv().await {
-                    self.handle_message(msg).await;
-                } else {
-                    break;
-                }
+                break;
             }
         }
     }
