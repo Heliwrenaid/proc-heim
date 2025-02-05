@@ -40,6 +40,7 @@ proptest = "1.5.0"
 default = []
 json = ["dep:serde", "dep:serde_json"]
 message-pack = ["dep:serde", "dep:rmp-serde", "dep:hex", "dep:base64"]
+serde = ["dep:serde"]
 
 
 [package.metadata.docs.rs]

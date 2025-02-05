@@ -4,6 +4,8 @@ mod id;
 mod process;
 mod runnable;
 mod script;
+#[cfg(feature = "serde")]
+mod serde;
 
 pub use builders::*;
 pub use command::*;

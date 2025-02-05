@@ -9,6 +9,7 @@ pub const SCRIPT_FILE_PATH_PLACEHOLDER: &str = "@FILE_PATH";
 /// `ScriptingLanguage` provides run configuration for 8 most popular scripting languages.
 /// If you want to use other language, see [`ScriptingLanguage::Other`].
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum ScriptingLanguage {
     /// Executes script with `bash` command.
@@ -79,6 +80,7 @@ impl From<ScriptingLanguage> for ScriptRunConfig {
 /// [`SCRIPT_FILE_PATH_PLACEHOLDER`] constant is used to mark that in this argument should be a path to a script file.
 /// Before spawning a script, the placeholder will be replaced by proper file path to the script (with extension provided in `file_extension` argument).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ScriptRunConfig {
     cmd: String,
     args: Vec<String>,
@@ -125,6 +127,7 @@ impl ScriptRunConfig {
 ///
 /// `Script` stores its content in a file and then executes [`Cmd`](struct@crate::model::command::Cmd) provided by [`Runnable`](trait@crate::model::Runnable) trait implementation.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Script {
     pub(crate) lang: ScriptingLanguage,
     pub(crate) content: String,

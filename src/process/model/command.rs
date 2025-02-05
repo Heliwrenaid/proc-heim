@@ -23,6 +23,7 @@ use super::Runnable;
 /// Note that using input/output redirection symbols (eg. `|`, `>>`, `2>`) as command arguments will fail.
 /// Instead use [`Script`](struct@crate::model::script::Script).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Cmd {
     pub(crate) cmd: String,
     pub(crate) args: Option<Vec<String>>,
@@ -247,6 +248,7 @@ impl Default for BufferCapacity {
 /// It is also possible to set logging in order to allow child process to produce logs
 /// which, unlike messages, are stored permanently and therefore can be read multiple times by parent process.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct CmdOptions {
     pub(crate) current_dir: Option<PathBuf>,
     pub(crate) clear_envs: bool,
@@ -399,7 +401,7 @@ impl CmdOptions {
     }
 }
 
-pub(super) fn validate_stdout_config(
+pub(crate) fn validate_stdout_config(
     messaging_type: Option<&MessagingType>,
     logging_type: Option<&LoggingType>,
 ) -> Result<(), CmdOptionsError> {
@@ -428,6 +430,7 @@ pub enum CmdOptionsError {
 
 /// Enum representing messaging type of a spawned process.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum MessagingType {
     /// Communicate with a spawned process via standard I/O.
     StandardIo,
@@ -437,6 +440,7 @@ pub enum MessagingType {
 
 /// Enum representing logging type of a spawned process.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum LoggingType {
     /// Collect logs only from standard output stream.
     StdoutOnly,
