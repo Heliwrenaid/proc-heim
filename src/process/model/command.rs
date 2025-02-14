@@ -26,7 +26,9 @@ use super::Runnable;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Cmd {
     pub(crate) cmd: String,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub(crate) args: Option<Vec<String>>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub(crate) options: CmdOptions,
 }
 

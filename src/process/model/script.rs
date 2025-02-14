@@ -8,11 +8,12 @@ pub const SCRIPT_FILE_PATH_PLACEHOLDER: &str = "@FILE_PATH";
 ///
 /// `ScriptingLanguage` provides run configuration for 8 most popular scripting languages.
 /// If you want to use other language, see [`ScriptingLanguage::Other`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum ScriptingLanguage {
     /// Executes script with `bash` command.
+    #[default]
     Bash,
     /// Executes script with `python` command.
     Python,
@@ -129,9 +130,12 @@ impl ScriptRunConfig {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Script {
+    #[cfg_attr(feature = "serde", serde(default))]
     pub(crate) lang: ScriptingLanguage,
     pub(crate) content: String,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub(crate) args: Option<Vec<String>>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub(crate) options: CmdOptions,
 }
 

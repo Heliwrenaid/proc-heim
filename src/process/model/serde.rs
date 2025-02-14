@@ -1,9 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use serde::{
-    de::{Error, Visitor},
-    Deserialize, Deserializer,
-};
+use serde::{de::Error, Deserialize, Deserializer};
 
 use crate::process::{validate_stdout_config, LoggingType, MessagingType};
 
@@ -14,24 +11,11 @@ impl<'de> Deserialize<'de> for BufferCapacity {
     where
         D: Deserializer<'de>,
     {
-        struct BufferCapacityVisitor;
+        #[derive(Deserialize)]
+        struct BufferCapacityHelper(usize);
 
-        impl<'de> Visitor<'de> for BufferCapacityVisitor {
-            type Value = BufferCapacity;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("an integer within a valid range")
-            }
-
-            fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
-            where
-                E: Error,
-            {
-                BufferCapacity::try_from(value as usize).map_err(E::custom)
-            }
-        }
-
-        deserializer.deserialize_u64(BufferCapacityVisitor)
+        let helper = BufferCapacityHelper::deserialize(deserializer)?;
+        BufferCapacity::try_from(helper.0).map_err(Error::custom)
     }
 }
 
@@ -40,7 +24,7 @@ impl serde::Serialize for BufferCapacity {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_u64(self.inner as u64)
+        serializer.serialize_i64(self.inner as i64)
     }
 }
 
@@ -49,7 +33,8 @@ impl<'de> Deserialize<'de> for CmdOptions {
     where
         D: Deserializer<'de>,
     {
-        #[derive(Deserialize)]
+        #[derive(Deserialize, Default)]
+        #[serde(default)]
         struct CmdOptionsHelper {
             current_dir: Option<PathBuf>,
             clear_envs: bool,
@@ -87,7 +72,7 @@ impl<'de> Deserialize<'de> for CmdOptions {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{collections::HashMap, path::PathBuf};
 
     use crate::process::{
         BufferCapacity, Cmd, CmdOptions, LoggingType, MessagingType, Script, ScriptRunConfig,
@@ -149,6 +134,32 @@ mod tests {
     }
 
     #[test]
+    fn should_deserialize_options_with_defaults() {
+        // without fields which is not Option<T>
+        let deserialized: CmdOptions =
+            serde_json::from_str(options_without_option_type_fields()).unwrap();
+        assert!(!deserialized.clear_envs);
+        assert_eq!(
+            BufferCapacity::default(),
+            deserialized.output_buffer_capacity
+        );
+
+        // with some fields
+        let serialized = r#"{"current_dir": "/bin", "clear_envs": true}"#;
+        let deserialized: CmdOptions = serde_json::from_str(serialized).unwrap();
+        let expected = CmdOptions {
+            current_dir: PathBuf::from("/bin").into(),
+            clear_envs: true,
+            ..Default::default()
+        };
+        assert_eq!(expected, deserialized);
+
+        // with none field
+        let deserialized: CmdOptions = serde_json::from_str("{}").unwrap();
+        assert_eq!(CmdOptions::default(), deserialized);
+    }
+
+    #[test]
     fn should_return_err_when_deserializing_invalid_options() {
         // Invalid buffer capacity = 0
         let serialized = options_json_with_invalid_buffer_capacity();
@@ -204,6 +215,11 @@ mod tests {
         r#"{"current_dir":"/some/path","clear_envs":true,"envs":{"ENV1":"value1"},"envs_to_remove":["PATH"],"output_buffer_capacity":24,"message_input":"StandardIo","message_output":"NamedPipe","logging_type":"StderrOnly"}"#
     }
 
+    /// No clear_envs and output_buffer_capacity fields are set
+    fn options_without_option_type_fields() -> &'static str {
+        r#"{"current_dir":"/some/path","envs":{"ENV1":"value1"},"envs_to_remove":["PATH"],"message_input":"StandardIo","message_output":"NamedPipe","logging_type":"StderrOnly"}"#
+    }
+
     fn options_json_with_invalid_buffer_capacity() -> &'static str {
         r#"{"current_dir":"/some/path","clear_envs":true,"envs":{"ENV1":"value1"},"envs_to_remove":["PATH"],"output_buffer_capacity":0,"message_input":"StandardIo","message_output":"NamedPipe","logging_type":"StderrOnly"}"#
     }
@@ -239,6 +255,21 @@ mod tests {
         assert_eq!(cmd, deserialized);
     }
 
+    #[test]
+    fn should_serialize_and_deserialize_cmd_with_defaults() {
+        // with no options
+        let expected = Cmd::with_args("ls", ["-l", "/bin"]);
+        let serialized = r#"{"cmd":"ls","args":["-l","/bin"]}"#;
+        let deserialized = serde_json::from_str(serialized).unwrap();
+        assert_eq!(expected, deserialized);
+
+        // with no options and args
+        let expected = Cmd::new("ls");
+        let serialized = r#"{"cmd":"ls"}"#;
+        let deserialized = serde_json::from_str(serialized).unwrap();
+        assert_eq!(expected, deserialized);
+    }
+
     // Script ----------------------------------------------
 
     #[test]
@@ -255,6 +286,24 @@ mod tests {
         let serialized = serde_json::to_string(&script).unwrap();
         let deserialized = serde_json::from_str(&serialized).unwrap();
 
+        assert_eq!(script, deserialized);
+    }
+
+    #[test]
+    fn should_deserialize_script_with_defaults() {
+        let lang = ScriptingLanguage::Bash;
+        let content = "echo";
+
+        // no options and no language
+        let script = Script::with_args(lang.clone(), content, ["Hello", "World"]);
+        let serialized = r#"{"content":"echo","args":["Hello","World"]}"#;
+        let deserialized = serde_json::from_str(serialized).unwrap();
+        assert_eq!(script, deserialized);
+
+        // no options, language and args
+        let script = Script::new(lang, content);
+        let serialized = r#"{"content":"echo"}"#;
+        let deserialized = serde_json::from_str(serialized).unwrap();
         assert_eq!(script, deserialized);
     }
 }
