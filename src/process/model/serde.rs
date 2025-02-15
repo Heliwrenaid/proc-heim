@@ -38,8 +38,8 @@ impl<'de> Deserialize<'de> for CmdOptions {
         struct CmdOptionsHelper {
             current_dir: Option<PathBuf>,
             clear_envs: bool,
-            envs: Option<HashMap<String, String>>,
-            envs_to_remove: Option<Vec<String>>,
+            envs: HashMap<String, String>,
+            envs_to_remove: Vec<String>,
             output_buffer_capacity: BufferCapacity,
             message_input: Option<MessagingType>,
             message_output: Option<MessagingType>,
@@ -51,9 +51,9 @@ impl<'de> Deserialize<'de> for CmdOptions {
         validate_stdout_config(helper.message_output.as_ref(), helper.logging_type.as_ref())
             .map_err(Error::custom)?;
 
-        if let (Some(envs), Some(envs_to_remove)) = (helper.envs.as_mut(), &helper.envs_to_remove) {
-            for env in envs_to_remove {
-                envs.remove(env);
+        if !helper.envs.is_empty() && !helper.envs_to_remove.is_empty() {
+            for env in &helper.envs_to_remove {
+                helper.envs.remove(env);
             }
         }
 
@@ -185,7 +185,7 @@ mod tests {
 
         let options = serde_json::from_str::<'_, CmdOptions>(serialized).unwrap();
 
-        let envs = options.envs.unwrap();
+        let envs = options.envs;
         assert_eq!(1, envs.len()); // PATH should be removed, because it appears in envs_to_remove
         let env = envs.get("ENV1");
         assert!(env.is_some());

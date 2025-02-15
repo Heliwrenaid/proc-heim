@@ -9,7 +9,7 @@ use super::{
 #[derive(Clone, Default, Debug)]
 pub struct CmdBuilder {
     cmd: Option<String>,
-    args: Option<Option<Vec<String>>>,
+    args: Option<Vec<String>>,
     options: Option<CmdOptions>,
 }
 
@@ -34,7 +34,7 @@ impl CmdBuilder {
         I: IntoIterator<Item = T>,
         T: Into<String>,
     {
-        self.args = Some(Some(args.into_iter().map(Into::into).collect()));
+        self.args = Some(args.into_iter().map(Into::into).collect());
         self
     }
 
@@ -167,8 +167,8 @@ impl CmdOptionsBuilder {
         Ok(CmdOptions {
             current_dir: self.current_dir.take(),
             clear_envs: self.clear_envs,
-            envs: self.envs.take(),
-            envs_to_remove: self.envs_to_remove.take(),
+            envs: self.envs.take().unwrap_or_default(),
+            envs_to_remove: self.envs_to_remove.take().unwrap_or_default(),
             output_buffer_capacity: self.output_buffer_capacity,
             message_input: self.message_input.take(),
             message_output: self.message_output.take(),
@@ -188,7 +188,7 @@ impl CmdOptionsBuilder {
 pub struct ScriptBuilder {
     language: Option<ScriptingLanguage>,
     content: Option<String>,
-    args: Option<Option<Vec<String>>>,
+    args: Option<Vec<String>>,
     options: Option<CmdOptions>,
 }
 
@@ -222,7 +222,7 @@ impl ScriptBuilder {
         I: IntoIterator<Item = T>,
         T: Into<String>,
     {
-        self.args = Some(Some(args.into_iter().map(Into::into).collect()));
+        self.args = Some(args.into_iter().map(Into::into).collect());
         self
     }
 

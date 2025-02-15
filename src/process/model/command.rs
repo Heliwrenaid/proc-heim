@@ -27,7 +27,7 @@ use super::Runnable;
 pub struct Cmd {
     pub(crate) cmd: String,
     #[cfg_attr(feature = "serde", serde(default))]
-    pub(crate) args: Option<Vec<String>>,
+    pub(crate) args: Vec<String>,
     #[cfg_attr(feature = "serde", serde(default))]
     pub(crate) options: CmdOptions,
 }
@@ -45,7 +45,7 @@ impl Cmd {
     {
         Self {
             cmd: cmd.into(),
-            args: None,
+            args: Vec::new(),
             options: CmdOptions::default(),
         }
     }
@@ -64,7 +64,7 @@ impl Cmd {
     {
         Self {
             cmd: cmd.into(),
-            args: Some(args.into_iter().map(Into::into).collect()),
+            args: args.into_iter().map(Into::into).collect(),
             options: CmdOptions::default(),
         }
     }
@@ -81,7 +81,7 @@ impl Cmd {
     {
         Self {
             cmd: cmd.into(),
-            args: None,
+            args: Vec::new(),
             options,
         }
     }
@@ -100,7 +100,7 @@ impl Cmd {
     {
         Self {
             cmd: cmd.into(),
-            args: Some(args.into_iter().map(Into::into).collect()),
+            args: args.into_iter().map(Into::into).collect(),
             options,
         }
     }
@@ -148,7 +148,7 @@ impl Cmd {
         S: Into<String>,
         I: IntoIterator<Item = S>,
     {
-        self.args = Some(args.into_iter().map(Into::into).collect());
+        self.args = args.into_iter().map(Into::into).collect();
     }
 
     /// Set a command options.
@@ -163,7 +163,6 @@ impl Cmd {
     }
 
     /// Add a new argument to the end of argument list.
-    /// If arguments was not specified during `Cmd` creation, it will create new argument list with given argument.
     /// # Examples
     /// ```
     /// # use proc_heim::model::command::*;
@@ -175,7 +174,22 @@ impl Cmd {
     where
         S: Into<String>,
     {
-        self.args.get_or_insert(Vec::new()).push(arg.into());
+        self.args.push(arg.into());
+    }
+
+    /// Get command name.
+    pub fn cmd(&mut self) -> &str {
+        &self.cmd
+    }
+
+    /// Get command arguments.
+    pub fn args(&mut self) -> &[String] {
+        &self.args
+    }
+
+    /// Get command options.
+    pub fn options(&mut self) -> &CmdOptions {
+        &self.options
     }
 
     /// Update command options via mutable reference.
@@ -254,8 +268,8 @@ impl Default for BufferCapacity {
 pub struct CmdOptions {
     pub(crate) current_dir: Option<PathBuf>,
     pub(crate) clear_envs: bool,
-    pub(crate) envs: Option<HashMap<String, String>>,
-    pub(crate) envs_to_remove: Option<Vec<String>>,
+    pub(crate) envs: HashMap<String, String>,
+    pub(crate) envs_to_remove: Vec<String>,
     pub(crate) output_buffer_capacity: BufferCapacity,
     pub(crate) message_input: Option<MessagingType>,
     pub(crate) message_output: Option<MessagingType>,
@@ -334,11 +348,10 @@ impl CmdOptions {
         V: Into<String>,
         I: IntoIterator<Item = (K, V)>,
     {
-        self.envs = Some(
-            envs.into_iter()
-                .map(|(k, v)| (k.into(), v.into()))
-                .collect(),
-        );
+        self.envs = envs
+            .into_iter()
+            .map(|(k, v)| (k.into(), v.into()))
+            .collect();
     }
 
     /// Add or update single environment variable.
@@ -347,9 +360,7 @@ impl CmdOptions {
         K: Into<String>,
         V: Into<String>,
     {
-        self.envs
-            .get_or_insert(HashMap::new())
-            .insert(name.into(), value.into());
+        self.envs.insert(name.into(), value.into());
     }
 
     /// Remove single environment variable (manually set earlier and also inherited from the parent process).
@@ -357,12 +368,8 @@ impl CmdOptions {
     where
         S: Into<String> + AsRef<str>,
     {
-        if let Some(envs) = self.envs.as_mut() {
-            envs.remove(name.as_ref());
-        }
-        self.envs_to_remove
-            .get_or_insert(Vec::new())
-            .push(name.into());
+        self.envs.remove(name.as_ref());
+        self.envs_to_remove.push(name.into());
     }
 
     /// Set message input type.
@@ -400,6 +407,46 @@ impl CmdOptions {
     /// If the buffer limit is reached and a child process sends a new message, the "oldest" buffered message will be removed.
     pub fn set_message_output_buffer_capacity(&mut self, capacity: BufferCapacity) {
         self.output_buffer_capacity = capacity;
+    }
+
+    /// Get current directory.
+    pub fn current_dir(&self) -> Option<&PathBuf> {
+        self.current_dir.as_ref()
+    }
+
+    /// Check if inherited environment variables will be cleared.
+    pub fn inherited_envs_cleared(&self) -> bool {
+        self.clear_envs
+    }
+
+    /// Get environment variables.
+    pub fn envs(&self) -> &HashMap<String, String> {
+        &self.envs
+    }
+
+    /// Get inherited environment variables to remove.
+    pub fn inherited_envs_to_remove(&self) -> &HashMap<String, String> {
+        &self.envs
+    }
+
+    /// Get message input type.
+    pub fn message_input(&self) -> Option<&MessagingType> {
+        self.message_input.as_ref()
+    }
+
+    /// Get message output type.
+    pub fn message_output(&self) -> Option<&MessagingType> {
+        self.message_output.as_ref()
+    }
+
+    /// Get logging type.
+    pub fn logging_type(&self) -> Option<&LoggingType> {
+        self.logging_type.as_ref()
+    }
+
+    /// Get message output buffer capacity.
+    pub fn message_output_buffer_capacity(&self) -> &BufferCapacity {
+        &self.output_buffer_capacity
     }
 }
 

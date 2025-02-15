@@ -11,7 +11,7 @@ Documentation on [docs.rs](https://docs.rs/proc-heim/).
  * bi-directional, message-based communication between child and parent processes via standard IO streams or named pipes,
  * collecting and querying logs produced by child processes (both running and completed).
 
-For more detailed list of features see [ProcessManagerHandle](https://docs.rs/proc-heim/latest/proc-heim/manager/struct.ProcessManagerHandle.html) documentation.
+For more detailed list of features see [ProcessManagerHandle](https://docs.rs/proc-heim/latest/proc_heim/manager/struct.ProcessManagerHandle.html) documentation.
 
 ## API overview
 `Proc-heim` library is divided into two modules: `model` and `manager`. 

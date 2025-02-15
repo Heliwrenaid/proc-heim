@@ -76,8 +76,8 @@ impl ProcessSpawner {
 
     fn spawn(&self, id: &ProcessId, cmd: Cmd) -> Result<Process, SpawnerError> {
         let mut child = Command::new(cmd.cmd);
-        if let Some(args) = cmd.args {
-            child.args(args);
+        if !cmd.args.is_empty() {
+            child.args(cmd.args);
         }
         child.kill_on_drop(true);
 
@@ -89,14 +89,12 @@ impl ProcessSpawner {
             child.env_clear();
         }
 
-        if let Some(envs) = cmd.options.envs_to_remove {
-            for env in envs {
-                child.env_remove(env);
-            }
+        for env in cmd.options.envs_to_remove {
+            child.env_remove(env);
         }
 
-        if let Some(envs) = cmd.options.envs {
-            child.envs(envs);
+        if !cmd.options.envs.is_empty() {
+            child.envs(cmd.options.envs);
         }
 
         let mut process_builder = ProcessBuilder::default();

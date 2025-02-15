@@ -134,7 +134,7 @@ pub struct Script {
     pub(crate) lang: ScriptingLanguage,
     pub(crate) content: String,
     #[cfg_attr(feature = "serde", serde(default))]
-    pub(crate) args: Option<Vec<String>>,
+    pub(crate) args: Vec<String>,
     #[cfg_attr(feature = "serde", serde(default))]
     pub(crate) options: CmdOptions,
 }
@@ -156,7 +156,7 @@ impl Script {
         Self {
             lang,
             content: content.into(),
-            args: None,
+            args: Vec::new(),
             options: CmdOptions::default(),
         }
     }
@@ -176,7 +176,7 @@ impl Script {
         Self {
             lang,
             content: content.into(),
-            args: Some(args.into_iter().map(Into::into).collect()),
+            args: args.into_iter().map(Into::into).collect(),
             options: CmdOptions::default(),
         }
     }
@@ -201,7 +201,7 @@ impl Script {
         Self {
             lang,
             content: content.into(),
-            args: None,
+            args: Vec::new(),
             options,
         }
     }
@@ -235,7 +235,7 @@ impl Script {
         Self {
             lang,
             content: content.into(),
-            args: Some(args.into_iter().map(Into::into).collect()),
+            args: args.into_iter().map(Into::into).collect(),
             options,
         }
     }
@@ -252,7 +252,7 @@ impl Script {
         S: Into<String>,
         I: IntoIterator<Item = S>,
     {
-        self.args = Some(args.into_iter().map(Into::into).collect());
+        self.args = args.into_iter().map(Into::into).collect();
     }
 
     /// Set a script options.
@@ -281,7 +281,27 @@ impl Script {
     where
         S: Into<String>,
     {
-        self.args.get_or_insert(Vec::new()).push(arg.into());
+        self.args.push(arg.into());
+    }
+
+    /// Get script language.
+    pub fn language(&mut self) -> &ScriptingLanguage {
+        &self.lang
+    }
+
+    /// Get script content.
+    pub fn content(&mut self) -> &str {
+        &self.content
+    }
+
+    /// Get script arguments.
+    pub fn args(&mut self) -> &[String] {
+        &self.args
+    }
+
+    /// Get script options.
+    pub fn options(&mut self) -> &CmdOptions {
+        &self.options
     }
 
     /// Update script options via mutable reference.
@@ -303,13 +323,11 @@ impl Runnable for Script {
         let file_path = create_script_file(self, &run_config, process_dir)?;
         run_config.replace_path_placeholder(&file_path);
 
-        if let Some(arguments) = &self.args {
-            run_config.args.extend_from_slice(arguments);
-        }
+        run_config.args.extend_from_slice(&self.args);
 
         let cmd = Cmd {
             cmd: run_config.cmd,
-            args: run_config.args.into(),
+            args: run_config.args,
             options: self.options.clone(),
         };
         Ok(cmd)
