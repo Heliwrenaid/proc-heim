@@ -448,6 +448,51 @@ impl CmdOptions {
     pub fn message_output_buffer_capacity(&self) -> &BufferCapacity {
         &self.output_buffer_capacity
     }
+
+    /// Update this options using values of other `CmdOptions`.
+    /// # Examples
+    /// ```
+    /// # use proc_heim::model::command::*;
+    /// # use std::collections::HashMap;
+    /// let mut options = CmdOptions::default();
+    /// let mut other = CmdOptions::with_standard_io_messaging();
+    /// other.clear_inherited_envs(true);
+    ///
+    /// options.update(other);
+    ///
+    /// let expected = MessagingType::StandardIo;
+    /// assert!(matches!(options.message_input(), expected));
+    /// assert!(matches!(options.message_output(), expected));
+    /// assert!(options.inherited_envs_cleared());
+    /// ```
+    pub fn update(&mut self, other: CmdOptions) {
+        if self.current_dir != other.current_dir {
+            self.current_dir = other.current_dir;
+        }
+        if self.clear_envs != other.clear_envs {
+            self.clear_envs = other.clear_envs;
+        }
+        if self.envs != other.envs {
+            self.envs = other.envs;
+        }
+        if self.envs_to_remove != other.envs_to_remove {
+            for env in other.envs_to_remove {
+                self.remove_env(env);
+            }
+        }
+        if self.message_input != other.message_input {
+            self.message_input = other.message_input;
+        }
+        if self.message_output != other.message_output {
+            self.message_output = other.message_output;
+        }
+        if self.logging_type != other.logging_type {
+            self.logging_type = other.logging_type;
+        }
+        if self.output_buffer_capacity != other.output_buffer_capacity {
+            self.output_buffer_capacity = other.output_buffer_capacity;
+        }
+    }
 }
 
 pub(crate) fn validate_stdout_config(
