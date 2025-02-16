@@ -178,17 +178,17 @@ impl Cmd {
     }
 
     /// Get command name.
-    pub fn cmd(&mut self) -> &str {
+    pub fn cmd(&self) -> &str {
         &self.cmd
     }
 
     /// Get command arguments.
-    pub fn args(&mut self) -> &[String] {
+    pub fn args(&self) -> &[String] {
         &self.args
     }
 
     /// Get command options.
-    pub fn options(&mut self) -> &CmdOptions {
+    pub fn options(&self) -> &CmdOptions {
         &self.options
     }
 
@@ -425,8 +425,8 @@ impl CmdOptions {
     }
 
     /// Get inherited environment variables to remove.
-    pub fn inherited_envs_to_remove(&self) -> &HashMap<String, String> {
-        &self.envs
+    pub fn inherited_envs_to_remove(&self) -> &[String] {
+        &self.envs_to_remove
     }
 
     /// Get message input type.

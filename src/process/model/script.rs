@@ -285,22 +285,22 @@ impl Script {
     }
 
     /// Get script language.
-    pub fn language(&mut self) -> &ScriptingLanguage {
+    pub fn language(&self) -> &ScriptingLanguage {
         &self.lang
     }
 
     /// Get script content.
-    pub fn content(&mut self) -> &str {
+    pub fn content(&self) -> &str {
         &self.content
     }
 
     /// Get script arguments.
-    pub fn args(&mut self) -> &[String] {
+    pub fn args(&self) -> &[String] {
         &self.args
     }
 
     /// Get script options.
-    pub fn options(&mut self) -> &CmdOptions {
+    pub fn options(&self) -> &CmdOptions {
         &self.options
     }
 
