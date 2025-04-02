@@ -1,20 +1,51 @@
-{ pkgs ? import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/a9b86fc2290b69375c5542b622088eb6eca2a7c3.tar.gz") {}}:
-pkgs.mkShell {
-  nativeBuildInputs = with pkgs; [ rustc cargo gcc rustfmt clippy llvmPackages_17.libllvm ];
-  buildInputs = with pkgs; [ 
-    php
-    lua
-    ruby
-    nodejs-slim
-    (pkgs.groovy.override { jdk = pkgs.jdk17; })
-    jdk17
-  ];
-  RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
-  shellHook = ''
-    export LLVM_COV=$(which llvm-cov)
-    export LLVM_PROFDATA=$(which llvm-profdata)
-    if [ -z $(cargo --list | grep llvm-cov) ]; then
-      cargo install cargo-llvm-cov@0.6.15
-    fi
-  '';
-}
+# For testing building docs with nightly (needed for #[feature] macros):
+# RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
+
+{ pkgs ? import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/f0946fa5f1fb876a9dc2e1850d9d3a4e3f914092.tar.gz") {}}:
+  let
+    overrides = (builtins.fromTOML (builtins.readFile ./rust-toolchain.toml));
+    libPath = with pkgs; lib.makeLibraryPath [
+      # load external libraries that you need in your rust project here
+    ];
+in
+  pkgs.mkShell rec {
+    buildInputs = with pkgs; [
+      clang
+      llvmPackages_17.bintools
+      rustup
+      php
+      lua
+      ruby
+      nodejs-slim
+      (pkgs.groovy.override { jdk = pkgs.jdk17; })
+      jdk17
+      cargo-llvm-cov
+    ];
+    RUSTC_VERSION = overrides.toolchain.channel;
+    # https://github.com/rust-lang/rust-bindgen#environment-variables
+    LIBCLANG_PATH = pkgs.lib.makeLibraryPath [ pkgs.llvmPackages_17.libclang.lib ];
+    shellHook = ''
+      export PATH=$PATH:''${CARGO_HOME:-~/.cargo}/bin
+      export PATH=$PATH:''${RUSTUP_HOME:-~/.rustup}/toolchains/$RUSTC_VERSION-x86_64-unknown-linux-gnu/bin/
+      alias clippy='cargo clippy --all-targets --all-features -- -D warnings'
+      alias ui='grpcui -plaintext -proto manager.proto localhost:8000'
+      '';
+    # Add precompiled library to rustc search path
+    RUSTFLAGS = (builtins.map (a: ''-L ${a}/lib'') [
+      # add libraries here (e.g. pkgs.libvmi)
+    ]);
+    LD_LIBRARY_PATH = libPath;
+    # Add glibc, clang, glib, and other headers to bindgen search path
+    BINDGEN_EXTRA_CLANG_ARGS =
+    # Includes normal include path
+    (builtins.map (a: ''-I"${a}/include"'') [
+      # add dev libraries here (e.g. pkgs.libvmi.dev)
+      pkgs.glibc.dev
+    ])
+    # Includes with special directory paths
+    ++ [
+      ''-I"${pkgs.llvmPackages_17.libclang.lib}/lib/clang/${pkgs.llvmPackages_17.libclang.version}/include"''
+      ''-I"${pkgs.glib.dev}/include/glib-2.0"''
+      ''-I${pkgs.glib.out}/lib/glib-2.0/include/''
+    ];
+  }
