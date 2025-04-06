@@ -8,7 +8,8 @@ use std::{
 
 use tokio::{
     sync::{
-        broadcast, mpsc,
+        broadcast,
+        mpsc::{self},
         oneshot::{self},
     },
     task::JoinHandle,
@@ -62,7 +63,7 @@ enum ProcessManagerMessage {
         responder: oneshot::Sender<Result<ProcessInfo, GetProcessInfoError>>,
     },
     Abort {
-        responder: oneshot::Sender<Result<(), AbortError>>,
+        responder: oneshot::Sender<()>,
     },
 }
 
@@ -80,6 +81,9 @@ enum ProcessManagerMessage {
 ///
 /// Each spawned process has its own [`ProcessId`], which can be used to interact with it through [`ProcessManagerHandle`].
 /// For convenience of interacting with one process, use a [`ProcessHandle`] wrapper.
+///
+/// Please note that once all manager handles are dropped, then all child processes will be killed and all `process directories` will be deleted.
+
 pub struct ProcessManager {
     working_dir: WorkingDir,
     process_spawner: ProcessSpawner,
@@ -127,7 +131,7 @@ impl ProcessManager {
             } else if let Some(msg) = self.receiver.recv().await {
                 self.handle_message(msg).await;
             } else {
-                break;
+                self.abort().await;
             }
         }
     }
@@ -266,14 +270,23 @@ impl ProcessManager {
         Ok(ProcessInfo::new(pid, exit_status))
     }
 
-    async fn abort(&mut self) -> Result<(), AbortError> {
+    async fn abort(&mut self) {
         self.is_aborted = true;
         self.receiver.close();
         let ids: Vec<ProcessId> = self.processes.keys().cloned().collect();
         for id in ids {
             let _ = self.kill_process(id).await;
         }
-        Ok(())
+    }
+}
+
+impl Drop for ProcessManager {
+    fn drop(&mut self) {
+        self.processes.keys().for_each(|id| {
+            let process_dir = self.working_dir.process_dir(id);
+            let _ = std::fs::remove_dir_all(process_dir);
+            // All processes will be killed automatically, thanks to kill_on_drop()
+        });
     }
 }
 
@@ -296,6 +309,8 @@ impl ProcessManager {
 ///
 /// `ProcessManagerHandle` can only be created by calling [`ProcessManager::spawn`] method.
 /// The handle can be cheaply cloned and used safely by many threads.
+///
+/// Please note that once all manager handles are dropped, then all child processes will be killed and all `process directories` will be deleted.
 #[derive(Clone, Debug)]
 pub struct ProcessManagerHandle {
     sender: mpsc::Sender<ProcessManagerMessage>,
@@ -337,6 +352,17 @@ impl ProcessManagerHandle {
     ) -> Result<ProcessHandle, SpawnProcessError> {
         let id = self.spawn(runnable).await?;
         Ok(ProcessHandle::new(id, self.clone()))
+    }
+
+    /// Like a [`Self::spawn_with_handle`], but dropping handle returned by this method will kill the child process managed by that handle.
+    /// If the handle has been cloned, the child process will terminate when the last instance of the handle is dropped.
+    /// There is no guarantee that the process will be completed immediately after the handle is dropped.
+    pub async fn spawn_with_scoped_handle(
+        &self,
+        runnable: impl Runnable,
+    ) -> Result<ProcessHandle, SpawnProcessError> {
+        let id = self.spawn(runnable).await?;
+        Ok(ProcessHandle::new_scoped(id, self.clone()))
     }
 
     /// Send a [`Message`] to the process with given `id`.
@@ -729,7 +755,8 @@ impl ProcessManagerHandle {
         Ok(())
     }
 
-    /// Abort a [`ProcessManager`] task associated with this handle.
+    /// Abort a [`ProcessManager`] task associated with this handle. This will kill all child processes and delete their corresponding `process directories`.
+    /// Please note that [`ProcessManager`] will be aborted automatically when all of its handles are dropped.
     pub async fn abort(&self) -> Result<(), AbortError> {
         let (responder, receiver) = oneshot::channel();
         let msg = ProcessManagerMessage::Abort { responder };
@@ -739,8 +766,21 @@ impl ProcessManagerHandle {
             .map_err(|_| AbortError::ManagerAlreadyAborted)?;
         receiver
             .await
-            .map_err(|_| AbortError::ManagerAlreadyAborted)??;
+            .map_err(|_| AbortError::ManagerAlreadyAborted)?;
         Ok(())
+    }
+
+    pub(crate) fn try_kill(&self, id: ProcessId) -> bool {
+        let (responder, _) = oneshot::channel();
+        let msg = ProcessManagerMessage::KillProcess { id, responder };
+        self.sender.try_send(msg).is_ok()
+    }
+
+    pub(crate) async fn kill_with_timeout(&self, id: ProcessId, duration: Duration) {
+        let (responder, receiver) = oneshot::channel();
+        let msg = ProcessManagerMessage::KillProcess { id, responder };
+        let _ = self.sender.send_timeout(msg, duration).await;
+        let _ = receiver.await;
     }
 }
 

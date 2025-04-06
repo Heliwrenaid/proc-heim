@@ -14,7 +14,7 @@ async fn should_get_data_of_not_completed_process() {
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     let process_data = handle.get_process_info(process_id).await.unwrap();
-    dbg!(&process_data);
+
     assert!(process_data.is_running());
     assert!(process_data.exit_status().is_none());
     assert!(process_data.pid().is_some());
