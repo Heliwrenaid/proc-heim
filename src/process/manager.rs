@@ -25,6 +25,7 @@ use crate::working_dir::WorkingDir;
 use super::{
     log_reader::{LogReaderError, LogsQuery, LogsQueryType},
     message::Message,
+    scoped_process_handle::ScopedProcessHandle,
     spawner::ProcessSpawner,
     ProcessHandle, ProcessInfo, Runnable,
 };
@@ -354,15 +355,17 @@ impl ProcessManagerHandle {
         Ok(ProcessHandle::new(id, self.clone()))
     }
 
-    /// Like a [`Self::spawn_with_handle`], but dropping handle returned by this method will kill the child process managed by that handle.
-    /// If the handle has been cloned, the child process will terminate when the last instance of the handle is dropped.
-    /// There is no guarantee that the process will be completed immediately after the handle is dropped.
+    /// Spawn a new child process, returning a [`ScopedProcessHandle`], which can be used to interact with the process.
+    /// Unlike [`ProcessHandle`], dropping this handle will kill the associated child process.
     pub async fn spawn_with_scoped_handle(
         &self,
         runnable: impl Runnable,
-    ) -> Result<ProcessHandle, SpawnProcessError> {
+    ) -> Result<ScopedProcessHandle, SpawnProcessError> {
         let id = self.spawn(runnable).await?;
-        Ok(ProcessHandle::new_scoped(id, self.clone()))
+        Ok(ScopedProcessHandle::new(ProcessHandle::new(
+            id,
+            self.clone(),
+        )))
     }
 
     /// Send a [`Message`] to the process with given `id`.

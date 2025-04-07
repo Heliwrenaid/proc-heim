@@ -28,7 +28,7 @@ in
       export PATH=$PATH:''${CARGO_HOME:-~/.cargo}/bin
       export PATH=$PATH:''${RUSTUP_HOME:-~/.rustup}/toolchains/$RUSTC_VERSION-x86_64-unknown-linux-gnu/bin/
       alias clippy='cargo clippy --all-targets --all-features -- -D warnings'
-      alias ui='grpcui -plaintext -proto manager.proto localhost:8000'
+      alias make-docs='RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features'
       '';
     # Add precompiled library to rustc search path
     RUSTFLAGS = (builtins.map (a: ''-L ${a}/lib'') [

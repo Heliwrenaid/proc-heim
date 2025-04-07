@@ -208,8 +208,8 @@ pub mod manager {
         GetLogsError, GetProcessInfoError, KillProcessError, LogsQuery, Message, MessageStreamExt,
         ProcessHandle, ProcessId, ProcessInfo, ProcessManager, ProcessManagerHandle,
         ReadMessageError, ReceiveDeserializedMessageError, ReceiveMessageError, ResultStreamExt,
-        SpawnProcessError, TryMessageStreamExt, WriteMessageError, INPUT_PIPE_ENV_NAME,
-        OUTPUT_PIPE_ENV_NAME, PROCESS_DATA_DIR_ENV_NAME,
+        ScopedProcessHandle, SpawnProcessError, TryMessageStreamExt, WriteMessageError,
+        INPUT_PIPE_ENV_NAME, OUTPUT_PIPE_ENV_NAME, PROCESS_DATA_DIR_ENV_NAME,
     };
 
     #[cfg(any(feature = "json", feature = "message-pack"))]
