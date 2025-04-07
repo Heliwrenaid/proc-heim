@@ -1,7 +1,7 @@
 workspace = { members = ["test-utils"] }
 [package]
 name = "proc-heim"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 description = "Library for running and managing short-lived and long-lived processes using asynchronous API"
 license = "MIT OR Apache-2.0"
