@@ -96,7 +96,7 @@ jobs:
           path: coverage/
   
   check-msrv:
-    name: Clippy
+    name: Check (MSRV) 
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -104,6 +104,5 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ env.MSRV }}
-          components: clippy
       - name: Linting
         run: cargo check --all-targets --all-features --locked
