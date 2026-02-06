@@ -1,4 +1,5 @@
 use std::{
+    fmt::Display,
     io::{self},
     path::PathBuf,
 };
@@ -72,13 +73,13 @@ pub(crate) enum LogsQueryType {
     Stderr,
 }
 
-impl ToString for LogsQueryType {
-    fn to_string(&self) -> String {
-        match self {
+impl Display for LogsQueryType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
             LogsQueryType::Stdout => "STDOUT",
             LogsQueryType::Stderr => "STDERR",
-        }
-        .into()
+        };
+        f.write_str(value)
     }
 }
 

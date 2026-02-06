@@ -56,14 +56,8 @@ impl CmdBuilder {
                     return Err(CmdBuilderError::UninitializedCmdName);
                 }
             },
-            args: match self.args.take() {
-                Some(value) => value,
-                None => Default::default(),
-            },
-            options: match self.options.take() {
-                Some(value) => value,
-                None => Default::default(),
-            },
+            args: self.args.take().unwrap_or_default(),
+            options: self.options.take().unwrap_or_default(),
         })
     }
 }
@@ -250,14 +244,8 @@ impl ScriptBuilder {
                     return Err(ScriptBuilderError::UninitializedScriptContent);
                 }
             },
-            args: match self.args.take() {
-                Some(value) => value,
-                None => Default::default(),
-            },
-            options: match self.options.take() {
-                Some(value) => value,
-                None => Default::default(),
-            },
+            args: self.args.take().unwrap_or_default(),
+            options: self.options.take().unwrap_or_default(),
         })
     }
 }

@@ -10,7 +10,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUST_VERSION_STABLE: 1.77.2
+  RUST_VERSION_STABLE: 1.78.0
+  MSRV: 1.75.0
 
 jobs:
   test:
@@ -70,6 +71,7 @@ jobs:
         run: RUSTDOCFLAGS="-D warnings" cargo doc --features json
       - name: Test documentation build (message-pack feature)
         run: RUSTDOCFLAGS="-D warnings" cargo doc --features message-pack
+  
   coverage:
     name: Code coverage
     runs-on: ubuntu-latest
@@ -92,3 +94,16 @@ jobs:
         with:
           name: "Coverage report"
           path: coverage/
+  
+  check-msrv:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ env.MSRV }}
+          components: clippy
+      - name: Linting
+        run: cargo check --all-targets --all-features --locked
